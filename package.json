@@ -1,0 +1,19 @@
+{
+  "name": "cmd",
+  "version": "1.0.0",
+  "description": "CLI for managing Claude Code skills, e.g. `npx cmd skills add <owner/repo> --skill <skill-name>`",
+  "license": "MIT",
+  "bin": {
+    "cmd": "./bin/cmd.js"
+  },
+  "files": [
+    "bin",
+    "src"
+  ],
+  "engines": {
+    "node": ">=18"
+  },
+  "scripts": {
+    "test": "node --test"
+  }
+}
