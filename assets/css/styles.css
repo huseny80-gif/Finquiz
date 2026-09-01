@@ -385,6 +385,19 @@ ul{list-style:none}
 /* ---------- من نحن والتواصل ---------- */
 .prose-card{background:var(--paper);border:1px solid var(--line);border-radius:var(--radius);padding:22px;box-shadow:var(--shadow);margin-bottom:16px}
 .prose-card h2{font-size:1.12rem;color:var(--navy);font-weight:900;margin-bottom:10px;border-inline-start:4px solid var(--gold);padding-inline-start:10px}
+
+.team-card{display:flex;gap:20px;align-items:flex-start;flex-wrap:wrap}
+.team-photo{
+  width:120px;height:120px;border-radius:14px;object-fit:cover;flex:0 0 120px;
+  border:2px solid var(--line);box-shadow:var(--shadow)
+}
+.team-info{flex:1 1 260px;min-width:0}
+.team-name{font-size:1.05rem;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.team-role{color:var(--teal);font-weight:700;font-size:.92rem;margin-top:2px}
+@media (max-width:480px){
+  .team-card{flex-direction:column;align-items:center;text-align:center}
+  .team-info{text-align:start}
+}
 .contact-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:12px}
 .contact-item{
   display:flex;align-items:center;gap:11px;background:var(--paper);border:1px solid var(--line);
@@ -392,7 +405,12 @@ ul{list-style:none}
 }
 .contact-item .ci-icon{font-size:1.3rem}
 .contact-item.is-off{color:var(--muted);border-style:dashed}
-.contact-item .ci-state{display:block;font-size:.76rem;color:var(--muted);font-weight:600}
+.contact-item .ci-state{
+  display:block;font-size:.76rem;color:var(--muted);font-weight:600;
+  /* أرقام الهاتف والبريد لاتينية الاتجاه دائماً — تُعزل عن اتجاه الصفحة RTL
+     كي لا تنقلب علامة + أو ترتيب الأرقام بصرياً */
+  direction:ltr;unicode-bidi:isolate;text-align:start
+}
 
 /* ---------- التذييل ---------- */
 .site-footer{background:var(--navy2);color:#C9D4D6;margin-top:46px;padding:34px 0 18px;font-size:.9rem}

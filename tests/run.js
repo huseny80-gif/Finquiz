@@ -486,6 +486,20 @@ test('رابط أرشيف الكورس الأول يشير إلى ملف موج�
   });
 });
 
+test('صورة الفريق موجودة فعلاً على القرص', () => {
+  const photo = DLP.config.about.team.photo;
+  assert(photo, 'لا توجد صورة معرّفة لعضو الفريق');
+  assert(fs.existsSync(path.join(ROOT, photo)), 'ملف الصورة مفقود: ' + photo);
+});
+
+test('وسائل التواصل الحقيقية (هاتف/واتساب/بريد) تُنتج روابط آمنة صحيحة', () => {
+  const channels = DLP.config.contact.channels;
+  const byId = Object.fromEntries(channels.map((c) => [c.id, c]));
+  equal(DLP.utils.safeUrl(byId.phone.hrefPrefix + byId.phone.value), 'tel:+9647706003138', 'رابط الهاتف');
+  equal(DLP.utils.safeUrl(byId.whatsapp.hrefPrefix + byId.whatsapp.value), 'https://wa.me/9647706003138', 'رابط واتساب');
+  equal(DLP.utils.safeUrl(byId.email.hrefPrefix + byId.email.value), 'mailto:huseny80@gmail.com', 'رابط البريد');
+});
+
 test('الصفحة عربية واتجاهها RTL', () => {
   const html = fs.readFileSync(path.join(ROOT, 'index.html'), 'utf8');
   assert(html.includes('lang="ar"'), 'lang مفقود');
