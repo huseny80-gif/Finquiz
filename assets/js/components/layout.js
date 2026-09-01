@@ -22,7 +22,7 @@
       '<header class="site-header">' +
         '<div class="header-inner">' +
           '<a class="brand" href="#/">' +
-            '<span class="brand-logo" aria-hidden="true">' + esc(s.brand.logoText) + '</span>' +
+            '<img class="brand-logo" src="' + esc(s.brand.logoImage) + '" alt="" aria-hidden="true">' +
             '<span class="brand-text">' +
               '<span class="brand-name">' + esc(s.brand.name) + '</span>' +
               '<span class="brand-sub">' + esc(s.program) + '</span>' +
