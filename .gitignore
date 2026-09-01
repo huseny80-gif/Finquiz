@@ -1,0 +1,12 @@
+node_modules/
+dist/
+.DS_Store
+Thumbs.db
+*.log
+npm-debug.log*
+.env
+.env.*
+.vscode/
+.idea/
+test-results/
+playwright-report/

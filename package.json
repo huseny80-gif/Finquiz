@@ -1,0 +1,15 @@
+{
+  "name": "digital-leadership-platform",
+  "version": "1.0.0",
+  "private": true,
+  "description": "منصة المواد الدراسية — الكورس الثاني — الدبلوم العالي المهني في القيادة الرقمية",
+  "scripts": {
+    "start": "node scripts/serve.js",
+    "test": "node tests/run.js",
+    "test:e2e": "node tests/e2e.js",
+    "validate": "node scripts/validate.js",
+    "build": "node scripts/validate.js && node tests/run.js"
+  },
+  "keywords": ["education", "arabic", "rtl", "static-site", "digital-leadership"],
+  "license": "UNLICENSED"
+}
