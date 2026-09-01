@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="theme-color" content="#123B4A">
+<title>الأسبوع الثاني — جولة داخل كلود: الواجهات والإعدادات</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Cairo:wght@700;800;900&family=Tajawal:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+:root{--navy:#123B4A;--navy2:#0C2A36;--gold:#B8891B;--gold2:#D4A72C;--ivory:#F7F4EC;--paper:#FFFFFF;--line:#D9D2C3;--muted:#5C6B70;--ink:#10222B;}
+*{box-sizing:border-box}
+body{margin:0;background:var(--ivory);color:var(--ink);font-family:'Tajawal',-apple-system,'Segoe UI',Tahoma,sans-serif;line-height:1.9;font-size:16.5px}
+h1,h2,h3{font-family:'Cairo',sans-serif;color:var(--navy);margin:0 0 10px}
+.wrap{max-width:840px;margin:0 auto;padding:26px 20px 70px}
+.hero{background:linear-gradient(135deg,var(--navy),var(--navy2));color:#EFEBDD;border-radius:12px;padding:22px 24px;margin-bottom:22px;border-inline-start:6px solid var(--gold)}
+.hero h1{color:#fff;font-size:1.4rem}
+.hero .sub{color:#C7D3D5;font-size:.92rem;margin-top:6px}
+.hero .attrib{margin-top:14px;font-size:.85rem;color:var(--gold2);font-weight:700}
+.section{background:var(--paper);border:1px solid var(--line);border-radius:12px;padding:20px 22px;margin-bottom:16px;box-shadow:0 1px 2px rgba(16,34,43,.05)}
+.section h2{font-size:1.08rem;border-inline-start:4px solid var(--gold);padding-inline-start:10px;margin-bottom:12px}
+.section p{margin:0 0 12px}
+.section b{color:var(--navy)}
+.note{background:#FBF3DD;border:1px solid #E8D6A2;border-radius:8px;padding:12px 14px;margin:12px 0;font-size:.92rem}
+.sample{background:var(--ivory);border:1px dashed var(--line);border-radius:8px;padding:12px 14px;font-size:.9rem;margin:8px 0}
+.terms{display:grid;gap:10px}
+.term{background:var(--ivory);border:1px solid var(--line);border-radius:8px;padding:12px 14px}
+.term b{color:var(--navy)}
+.hp-note{background:#FBF3DD;border:1px solid #E8D6A2;border-radius:8px;padding:12px 14px;margin:12px 0;font-size:.92rem}
+.hp-sample{background:var(--ivory);border:1px dashed var(--line);border-radius:8px;padding:12px 14px;font-size:.9rem;margin:8px 0;line-height:1.8}
+.hp-keypoints{background:#EEF3F5;border-inline-start:4px solid var(--navy);border-radius:8px;padding:14px 16px;margin:0 0 14px}
+.hp-keypoints ul{margin:8px 0 0;padding-inline-start:20px}
+.hp-keypoints li{margin-bottom:6px}
+.hp-kp-title{display:block;font-weight:800;color:var(--navy);font-family:'Cairo',sans-serif;margin-bottom:4px}
+.hp-formula{background:var(--navy);color:#EFEBDD;border-radius:8px;padding:12px 16px;margin:12px 0;font-weight:700;text-align:center;font-size:.95rem}
+.hp-crit{color:#B23A2E;font-weight:800}
+.hp-hl{background:linear-gradient(transparent 60%, #F6DFA0 60%)}
+.hp-cmp-wrap{overflow-x:auto;margin:12px 0}
+table.hp-cmp{width:100%;border-collapse:collapse;font-size:.9rem}
+table.hp-cmp th,table.hp-cmp td{border:1px solid var(--line);padding:8px 10px;text-align:start}
+table.hp-cmp th{background:var(--navy);color:#fff;font-family:'Cairo',sans-serif}
+table.hp-cmp tr:nth-child(even) td{background:var(--ivory)}
+</style>
+</head>
+<body>
+<div id="dlp-return-bar" style="position:sticky;top:0;z-index:9999;background:#0C2A36;color:#F2EFE6;padding:10px 16px;display:flex;flex-wrap:wrap;gap:10px;align-items:center;justify-content:space-between;font-family:'Tajawal',-apple-system,'Segoe UI',Tahoma,sans-serif;border-bottom:3px solid #B8891B">
+<span style="font-size:.86rem;color:#C9D4D6">المحاضرة الثانية — الذكاء الاصطناعي وتحليل البيانات</span>
+<span style="display:flex;gap:8px">
+<a href="../../index.html#/subject/ai-data/lectures" style="background:#B8891B;color:#22180A;text-decoration:none;padding:7px 14px;border-radius:8px;font-weight:800;font-size:.84rem">→ العودة إلى المحاضرات</a>
+<a href="../../index.html#/" style="background:rgba(255,255,255,.1);color:#fff;text-decoration:none;padding:7px 14px;border-radius:8px;font-weight:800;font-size:.84rem;border:1px solid rgba(255,255,255,.25)">⌂ الرئيسية</a>
+</span>
+</div>
+<div class="wrap">
+  <div class="hero">
+    <h1>الأسبوع الثاني — جولة داخل كلود: الواجهات والإعدادات</h1>
+    <div class="sub">محتوى المحاضرة الكامل — الذكاء الاصطناعي وتحليل البيانات</div>
+    
+  </div>
+  <div class="section"><h2>واجهات الاستخدام</h2><p><b>Chat:</b> محادثة جديدة، أرشيف كل نقاشاتك السابقة قابل للبحث، ورفع الملفات والصور والمحادثة الصوتية.</p><p><b>Projects:</b> ساحة محفوظة لمعلومات وملفات ثابتة لموضوع معيّن — تعليمات دائمة، ملفات مرجعية، ومحادثات ضمن سياق المشروع.</p><p><b>Artifacts:</b> ناتجة تفاعلية تُنتج نتيجة واحدة تعرض نفسك.</p><p><b>Cowork:</b> إدارة مهام (Working، Needs input، Ready for review، Completed، Archived) ووصول لملفاتك، والأجهزة الموثوقة والمتصفح المفضّل.</p><p><b>Dispatch:</b> إرسال مهمة لفرع مستقل ينفذ عنها بعيدًا ثم تُصوَّر عنك النتيجة.</p><p><b>المهام المجدولة (Scheduled runs):</b> مهام تعمل تلقائيًا في وقت محدد — تفعيل، سجل تنفيذات، وإيقاف.</p></div>
+  <div class="section"><h2>الإعدادات من الهاتف</h2><p><b>Profile:</b> اسمك وطبيعة عملك والتعليمات الدائمة.</p><p><b>Billing / Usage:</b> رصيدك وفواتيرك، مع إمكانية تفعيل إعادة التمحون التلقائي (Auto-reload).</p><p><b>Capabilities:</b> تفعيل وإطفاء مزايا كلود نفسها — Artifacts، الرسوم داخل المحادثة، وتنفيذ الأكواد وإنشاء الملفات.</p><p><b>Connectors:</b> الحسابات المرتبطة مثل Drive والبريد والتقويم.</p><p><b>Claude Code / Cowork:</b> تصنيف حالة الجلسة، تبديل النموذج عند الحاجة، ألوان مظهر الكود، طلب أجهزة موثوقة، والتنفيذ المحلي فقط (Only on your computer) بدل السحابة.</p></div>
+  <div class="section"><h2>الحوكمة والاستخدام الآمن</h2><p><b>تصنيف البيانات:</b> عام، داخلي، سرّي — ولكل تصنيف قواعد تعامل مختلفة.</p><p><b>البيانات الشخصية المحمية (PII):</b> إخفاء الهوية (Anonymization) قبل رفع أي بيانات تخص أشخاصًا محددين.</p><p><b>الإشراف البشري (Human in the loop):</b> المسؤولية والتوقيع والتحقق تبقى بشرية قبل اعتماد أي نتيجة.</p><p><b>سياسة استخدام موسّعة:</b> من يستخدم؟ لأي غرض؟ وبأي صلاحية؟</p></div>
+  <div class="section"><h2>🏷️ مسرد المصطلحات</h2><div class="terms">
+    <div class="term"><b>Cowork:</b> واجهة إدارة المهام الكبيرة التي تصل لملفاتك وتعمل بالخلفية.</div>
+    <div class="term"><b>Dispatch:</b> إرسال مهمة تُنفَّذ بعيدًا ثم تُعرض عليك نتيجتها.</div>
+    <div class="term"><b>Session (الجلسة):</b> نافذة عمل مستقلة لها سياقها وحالتها الخاصة.</div>
+    <div class="term"><b>Needs input:</b> حالة مهمة متوقفة بانتظار قرار منك.</div>
+    <div class="term"><b>Ready for review:</b> المهمة أُنجزت وتنتظر مراجعة اعتمادك.</div>
+    <div class="term"><b>Scheduled runs (المهام المجدولة):</b> مهام تعمل تلقائيًا في مواعيد محدَّدة.</div>
+    <div class="term"><b>Trigger (المشغّل):</b> الشرط أو الموعد الذي يُطلِق المهمة المجدولة.</div>
+    <div class="term"><b>Capabilities (القدرات):</b> مزايا كلود التي تُفعَّل أو تُطفَأ من الإعدادات.</div>
+    <div class="term"><b>Connectors (الموصلات):</b> الحسابات الخارجية المرتبطة مثل Drive والبريد والتقويم.</div>
+    <div class="term"><b>Trusted devices (الأجهزة الموثوقة):</b> أجهزة تم التحقق منها قبل السماح لها بالوصول لملفاتك.</div>
+    <div class="term"><b>Active sessions (الجلسات النشطة):</b> كل جهاز مفتوح حاليًا على حسابك مع موقعه وتاريخه.</div>
+    <div class="term"><b>Export data (تصدير البيانات):</b> تنزيل أرشيف كامل لمحاوراتك ومشاريعك.</div>
+    <div class="term"><b>Auto-reload (إعادة التمحون التلقائي):</b> شراء رصيد استخدام تلقائيًا عند اقترابه من النفاد.</div>
+    <div class="term"><b>Skills (المهارات):</b> أسلوب عمل جاهز تُخبِر كلود عند الحاجة تشغيله أو تنشرها بنفسك.</div>
+  </div></div>
+</div>
+</body>
+</html>
