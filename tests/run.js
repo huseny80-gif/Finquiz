@@ -431,6 +431,20 @@ test('سياسة أمان المحتوى ووسوم المشاركة موجود�
   assert(html.includes('routeAnnouncer'), 'منطقة إعلان المسار مفقودة');
 });
 
+test('لا يحتوي أي اسم ملف محارف تحكّم غير مرئية', () => {
+  // محارف الاتجاه (U+200E/U+200F/U+2068/U+2069) تكسر الروابط والنشر على بيئات مختلفة
+  const invisible = /[\u200B-\u200F\u2066-\u2069\uFEFF]/;
+  const offenders = [];
+  (function walk(dir) {
+    fs.readdirSync(dir, { withFileTypes: true }).forEach((entry) => {
+      if (entry.name === '.git' || entry.name === 'node_modules') { return; }
+      if (invisible.test(entry.name)) { offenders.push(path.relative(ROOT, path.join(dir, entry.name))); }
+      if (entry.isDirectory()) { walk(path.join(dir, entry.name)); }
+    });
+  })(ROOT);
+  assert(!offenders.length, 'أسماء ملفات بمحارف غير مرئية: ' + offenders.join(' | '));
+});
+
 test('رابط أرشيف الكورس الأول يشير إلى ملف موجود', () => {
   const archive = DLP.config.about.archive;
   assert(Array.isArray(archive) && archive.length, 'الأرشيف فارغ');
