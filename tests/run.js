@@ -354,6 +354,37 @@ test('كل مفاتيح النصوص المستخدمة معرّفة', () => {
     .forEach((key) => assert(Object.prototype.hasOwnProperty.call(table, key), 'مفتاح مفقود: ' + key));
 });
 
+test('الجدول الإنجليزي مكتمل ومطابق للعربية مفتاحاً بمفتاح', () => {
+  const ar = DLP.config.strings.ar;
+  const en = DLP.config.strings.en;
+  assert(en, 'الجدول الإنجليزي غير موجود');
+  const missing = Object.keys(ar).filter((k) => !Object.prototype.hasOwnProperty.call(en, k));
+  const extra = Object.keys(en).filter((k) => !Object.prototype.hasOwnProperty.call(ar, k));
+  assert(!missing.length, 'مفاتيح ناقصة في en: ' + missing.join(', '));
+  assert(!extra.length, 'مفاتيح زائدة في en: ' + extra.join(', '));
+  equal(en.dir, 'ltr', 'اتجاه الإنجليزية');
+  const empty = Object.keys(en).filter((k) => !String(en[k]).trim());
+  assert(!empty.length, 'قيم فارغة في en: ' + empty.join(', '));
+});
+
+test('لا توجد نصوص عربية مكتوبة داخل مكوّنات الواجهة', () => {
+  const arabic = /[\u0600-\u06FF]/;
+  const files = fs.readdirSync(path.join(ROOT, 'assets/js/components'))
+    .map((name) => path.join(ROOT, 'assets/js/components', name))
+    .concat([path.join(ROOT, 'assets/js/app.js')]);
+  const leaks = [];
+  files.forEach((file) => {
+    const content = fs.readFileSync(file, 'utf8');
+    const literals = content.match(/'(?:[^'\\]|\\.)*'/g) || [];
+    literals.forEach((literal) => {
+      if (arabic.test(literal) && literal.indexOf('DLP') === -1) {
+        leaks.push(path.basename(file) + ': ' + literal.slice(0, 40));
+      }
+    });
+  });
+  assert(!leaks.length, 'نصوص خارج طبقة الترجمة: ' + leaks.join(' | '));
+});
+
 test('الاتجاه واللغة معرّفان للعربية', () => {
   equal(DLP.config.strings.ar.dir, 'rtl', 'الاتجاه');
   equal(DLP.config.strings.ar.lang, 'ar', 'اللغة');
@@ -373,6 +404,40 @@ test('كل ملفات السكربت المشار إليها في index.html م�
   sources.forEach((src) => assert(fs.existsSync(path.join(ROOT, src)), 'ملف مفقود: ' + src));
   const styles = [...html.matchAll(/<link rel="stylesheet" href="(?!https)([^"]+)"/g)].map((m) => m[1]);
   styles.forEach((href) => assert(fs.existsSync(path.join(ROOT, href)), 'ملف تنسيق مفقود: ' + href));
+});
+
+test('كل إعلان تجريبي موسوم بوضوح', () => {
+  const realIds = ['ai-u4', 'lg-u3', 'ip-u3'];
+  DLP.store.subjects().forEach((subject) => {
+    DLP.store.list(subject, 'updates').forEach((update) => {
+      const isReal = realIds.indexOf(update.id) !== -1;
+      if (!isReal) { assert(update.demo === true, 'إعلان تجريبي بلا وسم: ' + update.id); }
+      else { assert(!update.demo, 'إعلان حقيقي موسوم خطأً: ' + update.id); }
+    });
+  });
+});
+
+test('ملفات النشر والفهرسة موجودة', () => {
+  ['robots.txt', 'sitemap.xml', '.github/workflows/ci.yml'].forEach((file) => {
+    assert(fs.existsSync(path.join(ROOT, file)), 'مفقود: ' + file);
+  });
+});
+
+test('سياسة أمان المحتوى ووسوم المشاركة موجودة', () => {
+  const html = fs.readFileSync(path.join(ROOT, 'index.html'), 'utf8');
+  assert(html.includes('Content-Security-Policy'), 'CSP مفقودة');
+  assert(html.includes("script-src 'self'"), 'CSP تسمح بسكربتات خارجية');
+  assert(html.includes('og:title'), 'وسوم og مفقودة');
+  assert(html.includes('routeAnnouncer'), 'منطقة إعلان المسار مفقودة');
+});
+
+test('رابط أرشيف الكورس الأول يشير إلى ملف موجود', () => {
+  const archive = DLP.config.about.archive;
+  assert(Array.isArray(archive) && archive.length, 'الأرشيف فارغ');
+  archive.forEach((item) => {
+    const target = path.join(ROOT, decodeURIComponent(item.url));
+    assert(fs.existsSync(target), 'ملف الأرشيف مفقود: ' + item.url);
+  });
 });
 
 test('الصفحة عربية واتجاهها RTL', () => {

@@ -1,0 +1,7 @@
+# منصة المواد الدراسية — الدبلوم العالي المهني في القيادة الرقمية
+User-agent: *
+Allow: /
+# ملفات المواد متاحة للفهرسة
+Allow: /files/
+
+Sitemap: https://huseny80-gif.github.io/Finquiz/sitemap.xml

@@ -19,7 +19,7 @@
     return '' +
       '<section class="section-block" aria-labelledby="statsTitle">' +
         '<div class="section-title"><h2 id="statsTitle">' + esc(t('stats.title')) + '</h2>' +
-        '<span class="sub">محسوبة تلقائياً من بيانات المنصة</span></div>' +
+        '<span class="sub">' + esc(t('stats.subtitle')) + '</span></div>' +
         '<div class="stats-grid">' +
           cards.map(function (card) {
             return '<div class="stat-card">' +
@@ -66,6 +66,7 @@
               '<div class="r-meta">' +
                 '<span class="badge badge-type">' + esc(row.subject.title) + '</span>' +
                 '<span class="badge badge-demo">' + esc(DLP.utils.formatDate(row.update.date)) + '</span>' +
+                (row.update.demo ? '<span class="badge badge-medium">' + esc(t('common.demo')) + '</span>' : '') +
               '</div>' +
             '</div>' +
             '<a class="btn btn-ghost btn-sm" href="#/subject/' + esc(row.subject.id) + '/updates">' +

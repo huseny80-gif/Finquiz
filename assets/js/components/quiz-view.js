@@ -5,9 +5,10 @@
   var DLP = global.DLP = global.DLP || {};
   var t = function (k, f) { return DLP.i18n.t(k, f); };
   var esc = function (v) { return DLP.utils.escapeHtml(v); };
-  var LETTERS = ['أ', 'ب', 'ج', 'د', 'هـ', 'و'];
+  function letters() { return t('quiz.letters').split(','); }
 
   var states = {};   // quizId -> state
+  var STORE_PREFIX = 'dlp.quiz.';
 
   function createState(quiz) {
     return {
@@ -21,8 +22,61 @@
     };
   }
 
+  /* ---------- حفظ التقدّم في المتصفح (محلي للجهاز، لا يُرسل لأي خادم) ---------- */
+
+  function storageAvailable() {
+    try {
+      var probe = STORE_PREFIX + 'probe';
+      global.localStorage.setItem(probe, '1');
+      global.localStorage.removeItem(probe);
+      return true;
+    } catch (e) { return false; }   // وضع التصفح الخاص أو تخزين معطّل
+  }
+
+  function save(state) {
+    if (!storageAvailable()) { return; }
+    try {
+      global.localStorage.setItem(STORE_PREFIX + state.quiz.id, JSON.stringify({
+        v: 1,
+        difficulty: state.difficulty,
+        index: state.index,
+        responses: state.responses,
+        checked: state.checked,
+        finished: state.finished
+      }));
+    } catch (e) { /* تجاوز الحصة المتاحة — نتجاهل بهدوء */ }
+  }
+
+  function load(quiz) {
+    var state = createState(quiz);
+    if (!storageAvailable()) { return state; }
+    try {
+      var raw = global.localStorage.getItem(STORE_PREFIX + quiz.id);
+      if (!raw) { return state; }
+      var saved = JSON.parse(raw);
+      if (!saved || saved.v !== 1) { return state; }
+      // نقبل فقط إجابات الأسئلة التي ما زالت موجودة في المحتوى الحالي
+      var validIds = {};
+      quiz.questions.forEach(function (q) { validIds[q.id] = true; });
+      ['responses', 'checked'].forEach(function (key) {
+        Object.keys(saved[key] || {}).forEach(function (id) {
+          if (validIds[id]) { state[key][id] = saved[key][id]; }
+        });
+      });
+      state.difficulty = saved.difficulty || 'all';
+      state.questions = DLP.quiz.filterByDifficulty(quiz.questions, state.difficulty);
+      state.index = Math.min(Math.max(0, saved.index || 0), Math.max(0, state.questions.length - 1));
+      state.finished = !!saved.finished;
+    } catch (e) { return createState(quiz); }
+    return state;
+  }
+
+  function clearSaved(quizId) {
+    try { global.localStorage.removeItem(STORE_PREFIX + quizId); } catch (e) { /* لا شيء */ }
+  }
+
   function getState(quiz) {
-    if (!states[quiz.id]) { states[quiz.id] = createState(quiz); }
+    if (!states[quiz.id]) { states[quiz.id] = load(quiz); }
     return states[quiz.id];
   }
 
@@ -36,7 +90,7 @@
     var response = state.responses[question.id];
     var checked = state.checked[question.id];
     var graded = checked ? DLP.quiz.grade(question, response) : null;
-    return '<div class="opt-list" role="group" aria-label="خيارات الإجابة">' +
+    return '<div class="opt-list" role="group" aria-label="' + esc(t('a11y.optionsGroup')) + '">' +
       question.options.map(function (option, i) {
         var classes = ['opt'];
         var mark = '';
@@ -46,7 +100,7 @@
         }
         return '<button type="button" class="' + classes.join(' ') + '" data-answer="mcq" data-value="' + i + '"' +
           ' aria-pressed="' + (Number(response) === i ? 'true' : 'false') + '"' + (checked ? ' disabled' : '') + '>' +
-          '<span class="let" aria-hidden="true">' + esc(LETTERS[i] || (i + 1)) + '</span>' +
+          '<span class="let" aria-hidden="true">' + esc(letters()[i] || (i + 1)) + '</span>' +
           '<span>' + esc(option) + '</span>' +
           (mark ? '<span class="mark" aria-hidden="true">' + mark + '</span>' : '') +
         '</button>';
@@ -58,7 +112,7 @@
     var response = state.responses[question.id];
     var checked = state.checked[question.id];
     var options = [{ value: 'true', label: t('quiz.true'), bool: true }, { value: 'false', label: t('quiz.false'), bool: false }];
-    return '<div class="opt-list" role="group" aria-label="صح أو خطأ">' +
+    return '<div class="opt-list" role="group" aria-label="' + esc(t('a11y.trueFalseGroup')) + '">' +
       options.map(function (option, i) {
         var classes = ['opt'];
         var mark = '';
@@ -68,7 +122,7 @@
         }
         return '<button type="button" class="' + classes.join(' ') + '" data-answer="tf" data-value="' + option.value + '"' +
           ' aria-pressed="' + (response === option.value ? 'true' : 'false') + '"' + (checked ? ' disabled' : '') + '>' +
-          '<span class="let" aria-hidden="true">' + esc(LETTERS[i]) + '</span><span>' + esc(option.label) + '</span>' +
+          '<span class="let" aria-hidden="true">' + esc(letters()[i]) + '</span><span>' + esc(option.label) + '</span>' +
           (mark ? '<span class="mark" aria-hidden="true">' + mark + '</span>' : '') +
         '</button>';
       }).join('') +
@@ -100,7 +154,7 @@
           '<span class="match-left" id="ml-' + esc(question.id) + '-' + i + '">' + esc(pair.left) + '</span>' +
           '<select class="match-select" data-answer="match" data-row="' + i + '"' +
             ' aria-labelledby="ml-' + esc(question.id) + '-' + i + '"' + (checked ? ' disabled' : '') + '>' +
-            '<option value="">— اختر —</option>' +
+            '<option value="">' + esc(t('quiz.choose')) + '</option>' +
             options.map(function (option) {
               return '<option value="' + esc(option) + '"' + (option === value ? ' selected' : '') + '>' + esc(option) + '</option>';
             }).join('') +
@@ -139,7 +193,7 @@
   function renderQuestion(state) {
     var question = current(state);
     if (!question) {
-      return '<div class="empty-state"><p>لا توجد أسئلة بهذا المستوى. اختر مستوى آخر.</p></div>';
+      return '<div class="empty-state"><p>' + esc(t('quiz.noneAtLevel')) + '</p></div>';
     }
     var checked = state.checked[question.id];
     var graded = checked ? DLP.quiz.grade(question, state.responses[question.id]) : null;
@@ -178,7 +232,7 @@
     if (!state.finished) { return ''; }
     var score = DLP.quiz.score(state.questions, state.responses);
     return '<div class="quiz-result">' +
-      '<div class="score-big">' + score.correct + ' / ' + score.total + ' (' + score.percent + '٪)</div>' +
+      '<div class="score-big">' + score.correct + ' / ' + score.total + ' (' + score.percent + esc(t('quiz.percent')) + ')</div>' +
       '<div class="score-sub">' + esc(t('quiz.result')) + '</div>' +
       '<div class="bars">' +
         '<span class="badge badge-easy">✓ ' + esc(t('quiz.correct')) + ': ' + score.correct + '</span>' +
@@ -227,6 +281,8 @@
           }).join('') +
           '<span class="label" style="margin-inline-start:auto">' + esc(t('quiz.questionsCount')) + ': ' +
             state.questions.length + '</span>' +
+          '<button class="filter-btn" type="button" data-quiz-action="clear" ' +
+            'title="' + esc(t('quiz.saved')) + '">🗑️ ' + esc(t('quiz.clearProgress')) + '</button>' +
         '</div>' +
         '<div class="quiz-progress" data-quiz-progress>' + renderProgress(state) + '</div>' +
         '<div class="quiz-body" data-quiz-body>' + renderQuestion(state) + '</div>' +
@@ -280,9 +336,10 @@
 
       if (target.hasAttribute('data-quiz-filter')) {
         state.difficulty = target.dataset.quizFilter;
-        state.questions = DLP.quiz.filterByDifficulty(state.quiz ? state.quiz.questions : context.quiz.questions, state.difficulty);
+        state.questions = DLP.quiz.filterByDifficulty(context.quiz.questions, state.difficulty);
         state.index = 0;
         state.finished = false;
+        save(state);
         refresh(context.root, state);
         return;
       }
@@ -293,13 +350,17 @@
         else if (action === 'prev' && state.index > 0) { state.index -= 1; }
         else if (action === 'check' && question) { state.checked[question.id] = true; }
         else if (action === 'finish') { state.finished = true; }
-        else if (action === 'retry') {
-          var difficulty = state.difficulty;
+        var wiped = false;
+        if (action === 'retry' || action === 'clear') {
+          var difficulty = action === 'clear' ? 'all' : state.difficulty;
+          clearSaved(context.quiz.id);
           states[context.quiz.id] = createState(context.quiz);
           states[context.quiz.id].difficulty = difficulty;
           states[context.quiz.id].questions = DLP.quiz.filterByDifficulty(context.quiz.questions, difficulty);
           state = states[context.quiz.id];
+          wiped = true;   // لا نُعيد الكتابة فوراً: التخزين يبقى نظيفاً حتى إجابة جديدة
         }
+        if (!wiped) { save(state); }
         refresh(context.root, state);
         if (action === 'finish') { context.root.querySelector('[data-quiz-result]').scrollIntoView({ behavior: 'smooth', block: 'center' }); }
         return;
@@ -319,6 +380,7 @@
           state.responses[question.id] = order;
         }
       } else { return; }
+      save(state);
       refresh(context.root, state);
     });
 
@@ -329,6 +391,7 @@
         if (!context) { return; }
         var question = current(context.state);
         if (question) { context.state.responses[question.id] = target.value; }
+        save(context.state);
         context.root.querySelector('[data-quiz-progress]').innerHTML = renderProgress(context.state);
       }
     });
@@ -343,10 +406,14 @@
         var answers = (context.state.responses[question.id] || []).slice();
         answers[Number(target.dataset.row)] = target.value;
         context.state.responses[question.id] = answers;
+        save(context.state);
         context.root.querySelector('[data-quiz-progress]').innerHTML = renderProgress(context.state);
       }
     });
   }
 
-  DLP.quizView = { renderSection: renderSection, renderQuiz: renderQuiz, bind: bind, resetStates: resetStates };
+  DLP.quizView = {
+    renderSection: renderSection, renderQuiz: renderQuiz, bind: bind,
+    resetStates: resetStates, clearSaved: clearSaved
+  };
 })(typeof window !== 'undefined' ? window : globalThis);

@@ -218,9 +218,9 @@
 
     updates: [
       { id: 'ai-u4', date: '2026-09-01', type: 'resource', title: 'رفع مقرر الأسبوع الأول والثاني', body: 'أُضيف ملف مقرر الذكاء الاصطناعي (الأسبوع الأول والثاني) إلى قسمي الملفات والمراجع.', status: 'published' },
-      { id: 'ai-u1', date: '2026-08-18', type: 'assignment', title: 'إضافة تمرين تصميم لوحة المؤشرات', body: 'أُضيف تمرين جديد بمستوى متوسط مع نموذج تسليم.', status: 'published' },
-      { id: 'ai-u2', date: '2026-08-17', type: 'lecture',    title: 'إضافة المحاضرة الثانية',          body: 'نُشرت محاضرة دورة حياة تحليل البيانات واتخاذ القرار.', status: 'published' },
-      { id: 'ai-u3', date: '2026-08-10', type: 'general',    title: 'افتتاح تبويب المادة',             body: 'تم إنشاء تبويب المادة وتفعيل أقسامه السبعة.', status: 'published' }
+      { id: 'ai-u1', date: '2026-08-18', type: 'assignment', title: 'إضافة تمرين تصميم لوحة المؤشرات', body: 'أُضيف تمرين جديد بمستوى متوسط مع نموذج تسليم.', status: 'published', demo: true },
+      { id: 'ai-u2', date: '2026-08-17', type: 'lecture',    title: 'إضافة المحاضرة الثانية',          body: 'نُشرت محاضرة دورة حياة تحليل البيانات واتخاذ القرار.', status: 'published', demo: true },
+      { id: 'ai-u3', date: '2026-08-10', type: 'general',    title: 'افتتاح تبويب المادة',             body: 'تم إنشاء تبويب المادة وتفعيل أقسامه السبعة.', status: 'published', demo: true }
     ]
   };
 

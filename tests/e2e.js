@@ -32,6 +32,11 @@ async function test(name, fn) {
   catch (error) { failed += 1; failures.push(name); console.log('  ✗ ' + name + '\n      ' + error.message); }
 }
 function assert(condition, message) { if (!condition) { throw new Error(message || 'التوقع لم يتحقق'); } }
+function equal(actual, expected, message) {
+  if (actual !== expected) {
+    throw new Error((message || 'قيمة غير متوقعة') + ` — المتوقع: ${expected} / الفعلي: ${actual}`);
+  }
+}
 function group(name) { console.log('\n▶ ' + name); }
 
 (async function main() {
@@ -59,6 +64,8 @@ function group(name) { console.log('\n▶ ' + name); }
   /** فتح مسار بحالة نظيفة — التنقل بين hash فقط لا يعيد تحميل الصفحة. */
   async function open(url) {
     await page.goto(url, { waitUntil: 'domcontentloaded' });
+    // مسح التقدّم المحفوظ حتى لا تتسرّب حالة اختبار إلى آخر
+    await page.evaluate(() => { try { localStorage.clear(); } catch (e) { /* لا شيء */ } });
     await page.reload({ waitUntil: 'domcontentloaded' });
   }
 
@@ -259,6 +266,103 @@ function group(name) { console.log('\n▶ ' + name); }
     await page.click('[data-quiz-filter="hard"]');
     assert(await page.getAttribute('[data-quiz-filter="hard"]', 'aria-pressed') === 'true', 'الفلتر غير نشط');
     assert((await page.textContent('.q-prompt')).includes('صعب'), 'السؤال المعروض ليس صعباً');
+  });
+
+  await test('تقدّم الاختبار يُحفظ بعد إعادة تحميل الصفحة', async () => {
+    await open(base + '#/subject/ai-data/quizzes');
+    await page.click('.opt[data-value="1"]');
+    await page.click('[data-quiz-action="check"]');
+    await page.reload({ waitUntil: 'domcontentloaded' });
+    await page.waitForSelector('.feedback.show', { timeout: 5000 });
+    assert((await page.textContent('.feedback')).includes('صحيحة'), 'لم تُستعد الإجابة المحفوظة');
+  });
+
+  await test('زر «مسح التقدّم» يمسح الحفظ فعلياً', async () => {
+    await page.click('[data-quiz-action="clear"]');
+    assert(!(await page.$('.feedback.show')), 'لم تُمسح الإجابة من الشاشة');
+    await page.reload({ waitUntil: 'domcontentloaded' });
+    assert(!(await page.$('.feedback.show')), 'عادت الإجابة بعد إعادة التحميل');
+    const stored = await page.evaluate(() => localStorage.getItem('dlp.quiz.ai-q1'));
+    assert(!stored, 'بقي أثر في التخزين المحلي');
+  });
+
+  await test('الاختبار يعمل حتى لو كان التخزين المحلي معطّلاً', async () => {
+    const ctx = await browser.newContext({ viewport: { width: 1280, height: 900 } });
+    await ctx.route(/fonts\.(googleapis|gstatic)\.com/, (route) =>
+      route.fulfill({ status: 200, contentType: 'text/css', body: '' }));
+    await ctx.addInitScript(() => {
+      Object.defineProperty(window, 'localStorage', {
+        get() { throw new Error('التخزين معطّل'); }
+      });
+    });
+    const blind = await ctx.newPage();
+    const errors = [];
+    blind.on('pageerror', (e) => errors.push(e.message));
+    await blind.goto(base + '#/subject/ai-data/quizzes', { waitUntil: 'domcontentloaded' });
+    await blind.click('.opt[data-value="1"]');
+    await blind.click('[data-quiz-action="check"]');
+    assert(await blind.$('.feedback.show'), 'الاختبار توقف عن العمل بلا تخزين');
+    assert(!errors.length, 'أخطاء: ' + errors.join(' | '));
+    await ctx.close();
+  });
+
+  group('إمكانية الوصول — إدارة التركيز والتبويبات');
+
+  await test('التركيز ينتقل إلى عنوان الصفحة عند تغيير المسار', async () => {
+    await page.goto(base, { waitUntil: 'domcontentloaded' });
+    await page.click('.subject-card a.btn');
+    await page.waitForSelector('#sectionPanel');
+    const tag = await page.evaluate(() => document.activeElement.tagName);
+    equal(tag, 'H1', 'التركيز لم ينتقل إلى العنوان');
+  });
+
+  await test('تغيّر الصفحة يُعلَن لقارئ الشاشة', async () => {
+    await page.goto(base + '#/about', { waitUntil: 'domcontentloaded' });
+    await page.waitForFunction(() => document.getElementById('routeAnnouncer').textContent.length > 0,
+      null, { timeout: 3000 });
+    const text = await page.textContent('#routeAnnouncer');
+    assert(text.includes('من نحن'), 'الإعلان لا يذكر الصفحة: ' + text);
+  });
+
+  await test('التبويبات تطبّق roving tabindex', async () => {
+    await page.goto(base + '#/subject/ai-data/summaries', { waitUntil: 'domcontentloaded' });
+    const values = await page.$$eval('[role="tab"]',
+      (els) => els.map((e) => e.getAttribute('tabindex')));
+    equal(values.filter((v) => v === '0').length, 1, 'يجب أن يكون تبويب واحد فقط في تسلسل Tab');
+    const activeTab = await page.getAttribute('[aria-selected="true"]', 'tabindex');
+    equal(activeTab, '0', 'التبويب النشط خارج تسلسل Tab');
+  });
+
+  await test('مفاتيح Home وEnd والأسهم تنقل التركيز بين التبويبات', async () => {
+    await page.focus('[aria-selected="true"]');
+    await page.keyboard.press('End');
+    let focused = await page.evaluate(() => document.activeElement.dataset.section);
+    equal(focused, 'updates', 'End لم ينقل إلى آخر تبويب');
+    await page.keyboard.press('Home');
+    focused = await page.evaluate(() => document.activeElement.dataset.section);
+    equal(focused, 'lectures', 'Home لم ينقل إلى أول تبويب');
+    await page.keyboard.press('ArrowLeft');
+    focused = await page.evaluate(() => document.activeElement.dataset.section);
+    equal(focused, 'summaries', 'السهم الأيسر لا يتقدّم في وضع RTL');
+  });
+
+  group('الأرشيف والملخص الخارجي');
+
+  await test('صفحة من نحن تعرض أرشيف الكورس الأول برابط يعمل', async () => {
+    await page.goto(base + '#/about', { waitUntil: 'domcontentloaded' });
+    assert(await page.$('#archive'), 'قسم الأرشيف مفقود');
+    const href = await page.getAttribute('#archive a.btn', 'href');
+    assert(href && href.length > 10, 'رابط الأرشيف مفقود');
+    const response = await page.request.get(base + href);
+    equal(response.status(), 200, 'ملف الأرشيف لا يُفتح');
+  });
+
+  await test('الملخص الخارجي يحمل شريط عودة إلى المنصة', async () => {
+    await page.goto(base + 'files/legal-regulatory/summary-01.html', { waitUntil: 'domcontentloaded' });
+    assert(await page.$('#dlp-return-bar'), 'شريط العودة مفقود');
+    await page.click('#dlp-return-bar a:first-child');
+    await page.waitForSelector('#sectionPanel', { timeout: 5000 });
+    assert(page.url().includes('legal-regulatory'), 'العودة لم تصل إلى المادة');
   });
 
   group('أزرار الرجوع والتنقل السريع');

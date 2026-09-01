@@ -8,8 +8,9 @@
   var fmt = function (v) { return DLP.utils.formatDate(v); };
 
   var FILE_TAGS = {
-    pdf: 'PDF', docx: 'WORD', doc: 'WORD', pptx: 'PPT', ppt: 'PPT',
-    xlsx: 'EXCEL', image: 'صورة', video: 'فيديو', link: 'رابط'
+    pdf: 'file.type.pdf', docx: 'file.type.docx', doc: 'file.type.docx',
+    pptx: 'file.type.pptx', ppt: 'file.type.pptx',
+    xlsx: 'file.type.xlsx', image: 'file.type.image', video: 'file.type.video', link: 'file.type.link'
   };
 
   function demoBadge(item) {
@@ -17,7 +18,7 @@
   }
 
   function fileChip(file) {
-    var tag = FILE_TAGS[file.type] || String(file.type || '').toUpperCase();
+    var tag = FILE_TAGS[file.type] ? t(FILE_TAGS[file.type]) : String(file.type || '').toUpperCase();
     var url = DLP.utils.safeUrl(file.url);
     var label = file.label || file.title || tag;
     if (!url) {
@@ -62,7 +63,7 @@
         '</div>' +
         '<div class="card-body"><p>' + esc(lecture.description) + '</p>' +
           (lecture.objectives && lecture.objectives.length
-            ? '<p class="subhead">🎯 أهداف المحاضرة</p><ul class="detail-list">' +
+            ? '<p class="subhead">🎯 ' + esc(t('lecture.objectives')) + '</p><ul class="detail-list">' +
               lecture.objectives.map(function (o) { return '<li>' + esc(o) + '</li>'; }).join('') + '</ul>'
             : '') +
           fileList(lecture.files) +
@@ -73,9 +74,9 @@
           '<a class="btn btn-ghost btn-sm" href="#/subject/' + esc(subject.id) + '/summaries">📝 ' + esc(t('section.summaries')) + '</a>' +
         '</div>' +
         '<div class="card-body" id="' + esc(lecture.id) + '-details" hidden>' +
-          '<p class="subhead">📄 محتوى المحاضرة</p>' +
+          '<p class="subhead">📄 ' + esc(t('lecture.content')) + '</p>' +
           '<p>' + esc(lecture.description) + '</p>' +
-          '<p class="notice" style="margin-top:12px">سيُعرض هنا نص المحاضرة الكامل أو ملفها فور رفعه في ملف بيانات المادة.</p>' +
+          '<p class="notice" style="margin-top:12px">' + esc(t('lecture.contentSoon')) + '</p>' +
         '</div>' +
       '</article>';
     }).join('');
@@ -141,8 +142,8 @@
             ' aria-expanded="false" aria-controls="' + esc(task.id) + '-details">' + esc(t('assignment.open')) + '</button>' +
         '</div>' +
         '<div class="card-body" id="' + esc(task.id) + '-details" hidden>' +
-          '<p class="subhead">📌 تفاصيل المهمة</p><p>' + esc(task.description) + '</p>' +
-          (task.due ? '<p class="notice" style="margin-top:12px">⏳ موعد التسليم: ' + esc(fmt(task.due)) + '</p>' : '') +
+          '<p class="subhead">📌 ' + esc(t('assignment.details')) + '</p><p>' + esc(task.description) + '</p>' +
+          (task.due ? '<p class="notice" style="margin-top:12px">⏳ ' + esc(t('assignment.dueNote')) + ': ' + esc(fmt(task.due)) + '</p>' : '') +
         '</div>' +
       '</article>';
     }).join('');
@@ -186,7 +187,7 @@
           return fileChip({ type: res.type, label: res.title + ' (' + fmt(res.date) + ')', url: res.url });
         }).join('') +
       '</div>' +
-      '<p class="notice" style="margin-top:16px">📎 تُضاف الملفات الفعلية بوضع مسارها في حقل url داخل ملف بيانات المادة.</p>' +
+      '<p class="notice" style="margin-top:16px">📎 ' + esc(t('resources.note')) + '</p>' +
     '</div></div>';
   }
 
@@ -201,7 +202,7 @@
           '<div style="flex:1;min-width:0">' +
             '<h3 class="card-title">' + esc(update.title) + '</h3>' +
             '<div class="card-meta"><span>📅 ' + esc(fmt(update.date)) + '</span>' +
-              '<span class="badge badge-type">' + esc(update.type) + '</span></div>' +
+              '<span class="badge badge-type">' + esc(update.type) + '</span>' + demoBadge(update) + '</div>' +
           '</div>' +
         '</div>' +
         '<div class="card-body"><p>' + esc(update.body) + '</p></div>' +
@@ -229,8 +230,10 @@
 
     var tabs = DLP.store.SECTIONS.map(function (section) {
       var count = section.key === 'quizzes' ? counts.questions : counts[section.key];
+      var isActive = section.key === active;
       return '<button class="sectionbar-btn" type="button" role="tab" id="tab-' + esc(section.key) + '"' +
-        ' aria-selected="' + (section.key === active ? 'true' : 'false') + '"' +
+        ' aria-selected="' + (isActive ? 'true' : 'false') + '"' +
+        ' tabindex="' + (isActive ? '0' : '-1') + '"' +
         ' aria-controls="sectionPanel" data-section="' + esc(section.key) + '">' +
         esc(section.num) + ' · ' + esc(section.icon) + ' ' + esc(t(section.labelKey)) +
         '<span class="cnt">' + esc(count) + '</span></button>';
@@ -255,7 +258,7 @@
             '<li class="chip">' + esc(t('section.resources')) + ' <b>' + counts.resources + '</b></li>' +
           '</ul>' +
         '</section>' +
-        '<div class="sectionbar" role="tablist" aria-label="' + esc(subject.title) + '">' + tabs + '</div>' +
+        '<div class="sectionbar" role="tablist" aria-label="' + esc(t('a11y.tabs')) + '">' + tabs + '</div>' +
         '<section id="sectionPanel" role="tabpanel" aria-labelledby="tab-' + esc(active) + '" tabindex="-1">' +
           '<div class="section-title"><h2>' + esc(t('section.' + active)) + '</h2></div>' +
           RENDERERS[active](subject) +
@@ -274,14 +277,25 @@
         DLP.router.navigate('#/subject/' + subject.id + '/' + button.dataset.section);
       });
       bar.addEventListener('keydown', function (event) {
-        if (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight') { return; }
+        var keys = ['ArrowLeft', 'ArrowRight', 'Home', 'End'];
+        if (keys.indexOf(event.key) === -1) { return; }
         var buttons = Array.prototype.slice.call(bar.querySelectorAll('.sectionbar-btn'));
         var index = buttons.indexOf(document.activeElement);
         if (index === -1) { return; }
         event.preventDefault();
-        // في RTL: السهم الأيسر يتقدّم والأيمن يتراجع
-        var step = event.key === 'ArrowLeft' ? 1 : -1;
-        var next = (index + step + buttons.length) % buttons.length;
+
+        var next;
+        if (event.key === 'Home') { next = 0; }
+        else if (event.key === 'End') { next = buttons.length - 1; }
+        else {
+          // الاتجاه يتبع اتجاه الصفحة: في RTL السهم الأيسر يتقدّم
+          var rtl = document.documentElement.getAttribute('dir') === 'rtl';
+          var forward = rtl ? event.key === 'ArrowLeft' : event.key === 'ArrowRight';
+          next = (index + (forward ? 1 : -1) + buttons.length) % buttons.length;
+        }
+
+        // roving tabindex: العنصر المركّز وحده يبقى في تسلسل Tab
+        buttons.forEach(function (button, i) { button.setAttribute('tabindex', i === next ? '0' : '-1'); });
         buttons[next].focus();
       });
     }

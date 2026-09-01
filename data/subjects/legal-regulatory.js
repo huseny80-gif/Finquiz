@@ -179,8 +179,8 @@
 
     updates: [
       { id: 'lg-u3', date: '2026-09-01', type: 'lecture', title: 'رفع ملف المحاضرة الأولى وملخصها', body: 'أُضيف ملف المحاضرة الأولى (PDF) والملخص التفاعلي الكامل لها.', status: 'published' },
-      { id: 'lg-u1', date: '2026-08-20', type: 'assignment', title: 'إضافة واجب قائمة التحقق', body: 'أُضيف واجب بمستوى صعب حول الامتثال في جمع البيانات.', status: 'published' },
-      { id: 'lg-u2', date: '2026-08-18', type: 'lecture',    title: 'إضافة المحاضرة الثانية',  body: 'نُشرت محاضرة الامتثال التنظيمي وحماية البيانات.', status: 'published' }
+      { id: 'lg-u1', date: '2026-08-20', type: 'assignment', title: 'إضافة واجب قائمة التحقق', body: 'أُضيف واجب بمستوى صعب حول الامتثال في جمع البيانات.', status: 'published', demo: true },
+      { id: 'lg-u2', date: '2026-08-18', type: 'lecture',    title: 'إضافة المحاضرة الثانية',  body: 'نُشرت محاضرة الامتثال التنظيمي وحماية البيانات.', status: 'published', demo: true }
     ]
   };
 

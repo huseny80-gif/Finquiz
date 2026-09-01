@@ -45,7 +45,7 @@
             '<label class="visually-hidden" for="globalSearchInput">' + esc(t('search.label')) + '</label>' +
             '<input class="search-input" id="globalSearchInput" type="search" autocomplete="off" ' +
               'placeholder="' + esc(t('search.placeholder')) + '">' +
-            '<button class="btn-search" type="submit">🔍 بحث</button>' +
+            '<button class="btn-search" type="submit">🔍 ' + esc(t('search.button')) + '</button>' +
           '</form>' +
         '</div>' +
       '</header>';
@@ -100,7 +100,7 @@
 
   function breadcrumbs(items) {
     return '' +
-      '<nav class="breadcrumbs" aria-label="مسار التصفح"><ol>' +
+      '<nav class="breadcrumbs" aria-label="' + esc(t('a11y.breadcrumbs')) + '"><ol>' +
         items.map(function (item, index) {
           var isLast = index === items.length - 1;
           return '<li>' + (isLast || !item.href

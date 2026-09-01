@@ -170,8 +170,8 @@
 
     updates: [
       { id: 'ip-u3', date: '2026-09-01', type: 'lecture', title: 'رفع ملف المحاضرة الأولى', body: 'أُضيف ملف المحاضرة الأولى (PDF) — الابتكار وإدارة المشاريع الرقمية ودور الابتكار في الاقتصاد الرقمي.', status: 'published' },
-      { id: 'ip-u1', date: '2026-08-22', type: 'assignment', title: 'إضافة واجب تحليل زحف النطاق', body: 'أُضيف واجب تحليلي بمستوى متوسط.', status: 'published' },
-      { id: 'ip-u2', date: '2026-08-20', type: 'lecture',    title: 'إضافة المحاضرة الثانية',      body: 'نُشرت محاضرة دورة حياة المشروع والقيود الثلاثية.', status: 'published' }
+      { id: 'ip-u1', date: '2026-08-22', type: 'assignment', title: 'إضافة واجب تحليل زحف النطاق', body: 'أُضيف واجب تحليلي بمستوى متوسط.', status: 'published', demo: true },
+      { id: 'ip-u2', date: '2026-08-20', type: 'lecture',    title: 'إضافة المحاضرة الثانية',      body: 'نُشرت محاضرة دورة حياة المشروع والقيود الثلاثية.', status: 'published', demo: true }
     ]
   };
 

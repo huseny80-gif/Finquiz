@@ -167,8 +167,8 @@
     ],
 
     updates: [
-      { id: 'cs-u1', date: '2026-08-21', type: 'quiz',    title: 'تحديث بنك أسئلة المادة', body: 'أُضيفت أسئلة ترتيب ومطابقة إلى اختبار المادة.', status: 'published' },
-      { id: 'cs-u2', date: '2026-08-19', type: 'lecture', title: 'إضافة المحاضرة الثانية', body: 'نُشرت محاضرة السياسات وإدارة الحوادث السيبرانية.', status: 'published' }
+      { id: 'cs-u1', date: '2026-08-21', type: 'quiz',    title: 'تحديث بنك أسئلة المادة', body: 'أُضيفت أسئلة ترتيب ومطابقة إلى اختبار المادة.', status: 'published', demo: true },
+      { id: 'cs-u2', date: '2026-08-19', type: 'lecture', title: 'إضافة المحاضرة الثانية', body: 'نُشرت محاضرة السياسات وإدارة الحوادث السيبرانية.', status: 'published', demo: true }
     ]
   };
 

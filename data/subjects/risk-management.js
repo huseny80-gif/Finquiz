@@ -169,8 +169,8 @@
     ],
 
     updates: [
-      { id: 'rm-u1', date: '2026-08-23', type: 'assignment', title: 'إضافة واجب مصفوفة 5×5', body: 'أُضيف واجب تطبيقي بمستوى سهل.', status: 'published' },
-      { id: 'rm-u2', date: '2026-08-21', type: 'lecture',    title: 'إضافة المحاضرة الثانية', body: 'نُشرت محاضرة تقييم المخاطر واستراتيجيات المعالجة.', status: 'published' }
+      { id: 'rm-u1', date: '2026-08-23', type: 'assignment', title: 'إضافة واجب مصفوفة 5×5', body: 'أُضيف واجب تطبيقي بمستوى سهل.', status: 'published', demo: true },
+      { id: 'rm-u2', date: '2026-08-21', type: 'lecture',    title: 'إضافة المحاضرة الثانية', body: 'نُشرت محاضرة تقييم المخاطر واستراتيجيات المعالجة.', status: 'published', demo: true }
     ]
   };
 

@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  المنصة تعمل بتوجيه hash، فالمسارات الداخلية (#/subject/...) ليست عناوين مستقلة
+  أمام محركات البحث. تُدرج هنا الصفحة الجذر وملفات المحتوى القابلة للفهرسة.
+-->
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+  <url>
+    <loc>https://huseny80-gif.github.io/Finquiz/</loc>
+    <changefreq>weekly</changefreq>
+    <priority>1.0</priority>
+  </url>
+  <url>
+    <loc>https://huseny80-gif.github.io/Finquiz/files/legal-regulatory/summary-01.html</loc>
+    <changefreq>monthly</changefreq>
+    <priority>0.6</priority>
+  </url>
+</urlset>

@@ -8,9 +8,24 @@
 
   function el(id) { return document.getElementById(id); }
 
-  function setTitle(parts) {
+  /** أول رسم للصفحة — لا يُنقل فيه التركيز حفاظاً على ترتيب Tab الطبيعي. */
+  var firstRender = true;
+
+  function setTitle(parts, description) {
     var site = DLP.config.site;
     document.title = parts.concat([site.brand.name + ' — ' + site.program]).filter(Boolean).join(' | ');
+    var meta = document.querySelector('meta[name="description"]');
+    if (meta) { meta.setAttribute('content', description || site.description); }
+    announce(parts.filter(Boolean).join(' — '));
+  }
+
+  /** إعلان تغيّر الصفحة لقارئ الشاشة. */
+  function announce(text) {
+    var region = el('routeAnnouncer');
+    if (!region) { return; }
+    region.textContent = '';
+    // تأخير بسيط يضمن التقاط قارئ الشاشة للتغيير
+    global.setTimeout(function () { region.textContent = t('nav.nowViewing') + ': ' + text; }, 60);
   }
 
   function paint(html, focusSelector) {
@@ -26,7 +41,16 @@
       }
     } else {
       global.scrollTo({ top: 0, behavior: 'auto' });
+      // نقل التركيز إلى عنوان الصفحة عند التنقل فقط.
+      // عند أول تحميل نترك التركيز في بداية المستند حتى يصل المستخدم
+      // إلى رابط التخطي وشريط التنقل بمفتاح Tab بشكل طبيعي.
+      if (!firstRender) {
+        var heading = main.querySelector('h1') || main;
+        heading.setAttribute('tabindex', '-1');
+        heading.focus({ preventScroll: true });
+      }
     }
+    firstRender = false;
   }
 
   function renderHome() {
@@ -38,7 +62,7 @@
     var subject = DLP.store.getSubject(params.id);
     if (!subject) { return renderNotFound(); }
     var section = params.section && DLP.subjectView.sectionExists(params.section) ? params.section : 'lectures';
-    setTitle([t('section.' + section), subject.title]);
+    setTitle([t('section.' + section), subject.title], subject.description);
     paint(DLP.subjectView.render(subject, section));
     DLP.subjectView.bind(subject, section);
 
@@ -54,7 +78,7 @@
   }
 
   function renderAbout(params, query) {
-    setTitle([t('nav.about')]);
+    setTitle([t('nav.about')], DLP.config.about.intro);
     paint(DLP.aboutView.render());
     focusTarget(query);
   }

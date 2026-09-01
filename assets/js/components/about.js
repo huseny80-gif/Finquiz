@@ -33,6 +33,21 @@
         '<p><b>' + esc(about.team.name) + '</b> — ' + esc(about.team.role) + '</p>' +
         '<p style="margin-top:6px;color:#5C6B70">' + esc(about.team.bio) + '</p>' +
       '</section>' +
+      (about.archive && about.archive.length
+        ? '<section class="prose-card" id="archive">' +
+            '<h2>🗃️ ' + esc(t('archive.title')) + '</h2>' +
+            about.archive.map(function (item) {
+              var url = DLP.utils.safeUrl(item.url);
+              return '<div style="margin-bottom:12px">' +
+                '<p style="font-weight:800;color:#123B4A">' + esc(item.title) + '</p>' +
+                '<p style="color:#5C6B70;font-size:.9rem;margin:4px 0 8px">' + esc(item.description) + '</p>' +
+                (url
+                  ? '<a class="btn btn-ghost btn-sm" href="' + esc(url) + '">📄 ' + esc(t('archive.open')) + '</a>'
+                  : '<span class="btn btn-ghost btn-sm" aria-disabled="true">' + esc(t('file.unavailable')) + '</span>') +
+              '</div>';
+            }).join('') +
+          '</section>'
+        : '') +
       '<p class="notice">⚠️ ' + esc(about.disclaimer) + '</p>' +
       DLP.contactView.block() +
       DLP.layout.endActions() +
