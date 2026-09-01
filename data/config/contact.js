@@ -8,14 +8,15 @@
 
   var CONTACT = {
     channels: [
-      { id: 'email',    label: 'البريد الإلكتروني', icon: '✉️', value: null, hrefPrefix: 'mailto:' },
-      { id: 'whatsapp', label: 'واتساب',            icon: '💬', value: null, hrefPrefix: 'https://wa.me/' },
+      { id: 'phone',    label: 'اتصال مباشر',       icon: '📱', value: '+9647706003138', hrefPrefix: 'tel:' },
+      { id: 'whatsapp', label: 'واتساب',            icon: '💬', value: '9647706003138', hrefPrefix: 'https://wa.me/' },
+      { id: 'email',    label: 'البريد الإلكتروني', icon: '✉️', value: 'huseny80@gmail.com', hrefPrefix: 'mailto:' },
       { id: 'telegram', label: 'تيليجرام',          icon: '✈️', value: null, hrefPrefix: 'https://t.me/' },
       { id: 'linkedin', label: 'لينكدإن',           icon: '💼', value: null, hrefPrefix: '' },
       { id: 'facebook', label: 'فيسبوك',            icon: '📘', value: null, hrefPrefix: '' }
     ],
     // نص يظهر للزوّار أسفل وسائل التواصل. للمشرف: طريقة التفعيل موضّحة في README.md
-    note: 'ستُضاف وسائل التواصل الرسمية للمنصة فور اعتمادها.'
+    note: 'يمكن التواصل مباشرة عبر الاتصال أو واتساب أو البريد الإلكتروني أدناه.'
   };
 
   global.DLP = global.DLP || {};
