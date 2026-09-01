@@ -45,6 +45,7 @@
           '<li class="chip">' + esc(site.course) + '</li>' +
         '</ul>' +
       '</section>' +
+      renderTeam(about.team) +
       about.sections.map(function (section) {
         return '<section class="prose-card" id="' + esc(section.id) + '">' +
           '<h2>' + esc(section.title) + '</h2>' +
@@ -53,7 +54,6 @@
           '</ul>' +
         '</section>';
       }).join('') +
-      renderTeam(about.team) +
       (about.archive && about.archive.length
         ? '<section class="prose-card" id="archive">' +
             '<h2>🗃️ ' + esc(t('archive.title')) + '</h2>' +
