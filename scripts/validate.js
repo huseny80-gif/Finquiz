@@ -41,11 +41,27 @@ check('كل ملفات JavaScript صحيحة الصياغة', () => {
     });
 });
 
-check('لا توجد ملفات ضخمة غير ضرورية (> 1MB)', () => {
-  walk(ROOT).forEach((file) => {
+check('ملفات الشيفرة خفيفة (< 1MB لكل ملف)', () => {
+  ['assets', 'data', 'scripts', 'tests'].forEach((dir) => {
+    const full = path.join(ROOT, dir);
+    if (!fs.existsSync(full)) { return; }
+    walk(full).forEach((file) => {
+      const size = fs.statSync(file).size;
+      if (size > 1024 * 1024) {
+        throw new Error(path.relative(ROOT, file) + ' حجمه ' + Math.round(size / 1024) + 'KB');
+      }
+    });
+  });
+});
+
+check('ملفات المحتوى ضمن حدود GitHub (< 100MB لكل ملف)', () => {
+  const full = path.join(ROOT, 'files');
+  if (!fs.existsSync(full)) { return; }
+  walk(full).forEach((file) => {
     const size = fs.statSync(file).size;
-    if (size > 1024 * 1024) {
-      throw new Error(path.relative(ROOT, file) + ' حجمه ' + Math.round(size / 1024) + 'KB');
+    if (size > 100 * 1024 * 1024) {
+      throw new Error(path.relative(ROOT, file) + ' حجمه ' + Math.round(size / 1048576) +
+        'MB — ارفعه على استضافة خارجية وضع رابطه في url');
     }
   });
 });
@@ -78,6 +94,24 @@ check('كل مرجع لمحاضرة داخل الملخصات صالح', () => {
       }
     });
   });
+});
+
+check('كل ملف مُشار إليه بمسار نسبي موجود فعلاً', () => {
+  const missing = [];
+  DLP.store.subjects().forEach((subject) => {
+    const urls = [];
+    const collect = (item) => (item.files || []).forEach((f) => urls.push([item.id, f.url]));
+    subject.lectures.forEach(collect);
+    subject.summaries.forEach(collect);
+    subject.assignments.forEach(collect);
+    subject.resources.forEach((r) => urls.push([r.id, r.url]));
+    subject.references.forEach((r) => urls.push([r.id, r.url]));
+    urls.forEach(([id, url]) => {
+      if (!url || /^(https?:|mailto:|tel:)/i.test(url)) { return; }
+      if (!fs.existsSync(path.join(ROOT, url))) { missing.push(id + ' → ' + url); }
+    });
+  });
+  if (missing.length) { throw new Error('ملفات مفقودة: ' + missing.join(' , ')); }
 });
 
 const stats = DLP.store.stats();
