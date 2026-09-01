@@ -8,9 +8,9 @@
   var SITE = {
     id: 'digital-leadership-course-2',
     brand: {
-      name: 'منصة المواد الدراسية',
-      logoText: 'د.ق',
-      logoAlt: 'شعار منصة المواد الدراسية للدبلوم العالي المهني في القيادة الرقمية'
+      name: 'القيادة الرقمية',
+      logoImage: 'assets/img/logo.webp',
+      logoAlt: 'شعار منصة القيادة الرقمية'
     },
     program: 'الدبلوم العالي المهني في القيادة الرقمية',
     course: 'مواد الكورس الثاني',

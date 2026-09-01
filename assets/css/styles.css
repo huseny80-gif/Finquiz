@@ -64,9 +64,7 @@ ul{list-style:none}
 .brand:hover{text-decoration:none}
 .brand-logo{
   width:42px;height:42px;flex:0 0 42px;border-radius:10px;
-  background:linear-gradient(140deg,var(--gold2),var(--gold));
-  color:var(--navy2);display:grid;place-items:center;font-weight:900;font-size:.95rem;
-  font-family:'Cairo',sans-serif;box-shadow:inset 0 0 0 1px rgba(255,255,255,.25)
+  object-fit:contain;background:rgba(255,255,255,.06)
 }
 .brand-text{display:flex;flex-direction:column;line-height:1.3}
 .brand-name{font-weight:900;font-size:1rem}
