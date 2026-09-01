@@ -55,6 +55,12 @@
         result.correct = result.answered && arraysEqual(response, question.items);
         break;
 
+      case 'open':
+        // سؤال مفتوح (سيناريو/مقالي): لا إجابة "صحيحة" آلياً — تقييم ذاتي عبر معايير (rubric).
+        result.answered = typeof response === 'string' && response.trim() !== '';
+        result.correct = false;   // لا يُحتسب ضمن نسبة الصح/الخطأ في score()
+        break;
+
       default:
         break;
     }
@@ -73,22 +79,34 @@
     }
   }
 
-  /** حساب النتيجة الكلية من خريطة إجابات {questionId: response}. */
+  /**
+   * حساب النتيجة الكلية من خريطة إجابات {questionId: response}.
+   * الأسئلة المفتوحة (type:'open') تُحسب ضمن "answered" لكن تُستثنى من نسبة الصح/الخطأ
+   * (لا إجابة صحيحة آلية لها) — عند غياب أسئلة مفتوحة يبقى السلوك مطابقاً تماماً للسابق.
+   */
   function score(questions, responses) {
     var correct = 0;
     var answered = 0;
+    var gradable = 0;
+    var gradableAnswered = 0;
     questions.forEach(function (question) {
       var result = grade(question, responses[question.id]);
       if (result.answered) { answered += 1; }
-      if (result.correct) { correct += 1; }
+      if (question.type !== 'open') {
+        gradable += 1;
+        if (result.answered) { gradableAnswered += 1; }
+        if (result.correct) { correct += 1; }
+      }
     });
     var total = questions.length;
     return {
-      total: total,
+      total: gradable,
+      allTotal: total,
       answered: answered,
+      gradableAnswered: gradableAnswered,
       correct: correct,
-      wrong: answered - correct,
-      percent: total ? Math.round((correct / total) * 100) : 0
+      wrong: gradableAnswered - correct,
+      percent: gradable ? Math.round((correct / gradable) * 100) : 0
     };
   }
 

@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="theme-color" content="#123B4A">
+<title>الأسبوع الأول — كلود Claude: مدخل إلى الذكاء الاصطناعي التوليدي</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Cairo:wght@700;800;900&family=Tajawal:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+:root{--navy:#123B4A;--navy2:#0C2A36;--gold:#B8891B;--gold2:#D4A72C;--ivory:#F7F4EC;--paper:#FFFFFF;--line:#D9D2C3;--muted:#5C6B70;--ink:#10222B;}
+*{box-sizing:border-box}
+body{margin:0;background:var(--ivory);color:var(--ink);font-family:'Tajawal',-apple-system,'Segoe UI',Tahoma,sans-serif;line-height:1.9;font-size:16.5px}
+h1,h2,h3{font-family:'Cairo',sans-serif;color:var(--navy);margin:0 0 10px}
+.wrap{max-width:840px;margin:0 auto;padding:26px 20px 70px}
+.hero{background:linear-gradient(135deg,var(--navy),var(--navy2));color:#EFEBDD;border-radius:12px;padding:22px 24px;margin-bottom:22px;border-inline-start:6px solid var(--gold)}
+.hero h1{color:#fff;font-size:1.4rem}
+.hero .sub{color:#C7D3D5;font-size:.92rem;margin-top:6px}
+.hero .attrib{margin-top:14px;font-size:.85rem;color:var(--gold2);font-weight:700}
+.section{background:var(--paper);border:1px solid var(--line);border-radius:12px;padding:20px 22px;margin-bottom:16px;box-shadow:0 1px 2px rgba(16,34,43,.05)}
+.section h2{font-size:1.08rem;border-inline-start:4px solid var(--gold);padding-inline-start:10px;margin-bottom:12px}
+.section p{margin:0 0 12px}
+.section b{color:var(--navy)}
+.note{background:#FBF3DD;border:1px solid #E8D6A2;border-radius:8px;padding:12px 14px;margin:12px 0;font-size:.92rem}
+.sample{background:var(--ivory);border:1px dashed var(--line);border-radius:8px;padding:12px 14px;font-size:.9rem;margin:8px 0}
+.terms{display:grid;gap:10px}
+.term{background:var(--ivory);border:1px solid var(--line);border-radius:8px;padding:12px 14px}
+.term b{color:var(--navy)}
+.hp-note{background:#FBF3DD;border:1px solid #E8D6A2;border-radius:8px;padding:12px 14px;margin:12px 0;font-size:.92rem}
+.hp-sample{background:var(--ivory);border:1px dashed var(--line);border-radius:8px;padding:12px 14px;font-size:.9rem;margin:8px 0;line-height:1.8}
+.hp-keypoints{background:#EEF3F5;border-inline-start:4px solid var(--navy);border-radius:8px;padding:14px 16px;margin:0 0 14px}
+.hp-keypoints ul{margin:8px 0 0;padding-inline-start:20px}
+.hp-keypoints li{margin-bottom:6px}
+.hp-kp-title{display:block;font-weight:800;color:var(--navy);font-family:'Cairo',sans-serif;margin-bottom:4px}
+.hp-formula{background:var(--navy);color:#EFEBDD;border-radius:8px;padding:12px 16px;margin:12px 0;font-weight:700;text-align:center;font-size:.95rem}
+.hp-crit{color:#B23A2E;font-weight:800}
+.hp-hl{background:linear-gradient(transparent 60%, #F6DFA0 60%)}
+.hp-cmp-wrap{overflow-x:auto;margin:12px 0}
+table.hp-cmp{width:100%;border-collapse:collapse;font-size:.9rem}
+table.hp-cmp th,table.hp-cmp td{border:1px solid var(--line);padding:8px 10px;text-align:start}
+table.hp-cmp th{background:var(--navy);color:#fff;font-family:'Cairo',sans-serif}
+table.hp-cmp tr:nth-child(even) td{background:var(--ivory)}
+</style>
+</head>
+<body>
+<div id="dlp-return-bar" style="position:sticky;top:0;z-index:9999;background:#0C2A36;color:#F2EFE6;padding:10px 16px;display:flex;flex-wrap:wrap;gap:10px;align-items:center;justify-content:space-between;font-family:'Tajawal',-apple-system,'Segoe UI',Tahoma,sans-serif;border-bottom:3px solid #B8891B">
+<span style="font-size:.86rem;color:#C9D4D6">المحاضرة الأولى — الذكاء الاصطناعي وتحليل البيانات</span>
+<span style="display:flex;gap:8px">
+<a href="../../index.html#/subject/ai-data/lectures" style="background:#B8891B;color:#22180A;text-decoration:none;padding:7px 14px;border-radius:8px;font-weight:800;font-size:.84rem">→ العودة إلى المحاضرات</a>
+<a href="../../index.html#/" style="background:rgba(255,255,255,.1);color:#fff;text-decoration:none;padding:7px 14px;border-radius:8px;font-weight:800;font-size:.84rem;border:1px solid rgba(255,255,255,.25)">⌂ الرئيسية</a>
+</span>
+</div>
+<div class="wrap">
+  <div class="hero">
+    <h1>الأسبوع الأول — كلود Claude: مدخل إلى الذكاء الاصطناعي التوليدي</h1>
+    <div class="sub">محتوى المحاضرة الكامل — الذكاء الاصطناعي وتحليل البيانات</div>
+    
+  </div>
+  <div class="section"><h2>الأساسيات</h2><p>كلود نموذج لغوي كبير (LLM) يتوقع الكلمة التالية بناءً على أنماط تعلّمها من نصوص هائلة — وهذا التوقّع ليس تفكيرًا بالمعنى البشري.</p><p>يمر أي طلب بأربع مراحل: <b>الأمر (Prompt)</b> — الجملة التي تكتبها للبرنامج وتوضّح فيها ما تريده بالضبط، ثم <b>التقطيع (Tokenization)</b> — تقسيم جملتك إلى قطع صغيرة يتعامل معها البرنامج، ثم <b>التمثيل الرقمي (Embeddings)</b> — تحويل كل قطعة نص إلى أرقام تقارب معناها، وأخيرًا <b>التوليد (Generation)</b>.</p><div class='hp-note'><b>الهلوسة (Hallucination):</b> افترض دائمًا أن إجابة الذكاء الاصطناعي قد تكون خاطئة حتى لو بدت مقنعة — وتحقّق من المعلومات الحساسة قبل اعتمادها.</div></div>
+  <div class="section"><h2>التعرّف على كلود</h2><p>يُبنى كلود على مبادئ نافع، صادق وآمن، ويصدر أحكامه قبل تسليمها لك. تصل نافذة سياقه إلى نحو 500 صفحة نص في المحادثة الواحدة.</p><p>أبرز الاستخدامات: كتابة المحتوى، البحث وتحليل البيانات، البرمجة (كلود كود)، والتعلّم والتدريس.</p></div>
+  <div class="section"><h2>البداية العملية</h2><p>يمكن الوصول إلى كلود عبر أربع طرق: تطبيق سطح المكتب (Windows وMac)، المتصفّح عبر claude.ai، وتطبيق الجوال (Android وiOS).</p><p>خطط الاشتراك: مجانية، برو (٢٠ دولارًا شهريًا)، وماكس (١٠٠ دولار شهريًا).</p></div>
+  <div class="section"><h2>شات، كوورك، وكود: شنو الفرق؟</h2><p><b>كلود شات (Chat):</b> مهام سريعة — سؤال مباشر أو محادثة فورية.</p><p><b>كلود كوورك (Cowork):</b> مهام أكبر ووصول حقيقي لملفاتك، ويعمل بشكل متوازٍ في الخلفية.</p><p><b>كلود كود (Claude Code):</b> بيئة تطوير كاملة — قراءة الأكواد وتحسينها ومعالجة مشاكلها.</p><p>يمكن لكلود كوورك إرسال فروع مهام إلى وكلاء فرعيين مستقلين (Dispatch / Subagents) يشتغل كل منهم بمهمة منفصلة مركّزة، فتبقى المحادثة الرئيسية مركّزة على النتيجة النهائية فقط.</p></div>
+  <div class="section"><h2>هندسة الأوامر</h2><p>القواعد الأربع لصياغة أمر ناجح: (١) تحديد الموقف والسياق، (٢) تحديد المهمة بوضوح، (٣) تحديد القواعد والشكل المطلوب، (٤) تقديم مثال.</p><p>اختيار النموذج: هايكو للسرعة، سونيت للتوازن (الافتراضي)، أوبس للدقة العالية، والتفكير الممتد (Extended thinking) عند الحاجة لتحليل أعمق.</p><div class='hp-note'><b>عقلية التكرار</b> أفضل من «عقلية اللقطة الواحدة»: ابنِ السياق تدريجيًا وقدّم ملاحظات وتصحيحات واضحة بعد كل نتيجة، بدل توقّع إجابة كاملة من أمر واحد.</div></div>
+  <div class="section"><h2>المشاريع والملحقات والمهارات</h2><p><b>المشاريع (Projects):</b> بيئة معزولة بذاكرة ومعلومات وملفات ثابتة لكل موضوع تتعامل معه بانتظام.</p><p><b>الأرتيفاكتس (Artifacts):</b> نافذة تفاعلية مستقلة لعرض النتائج الكبيرة أو المواقع أو المستندات الطويلة، ومشاركتها برابط.</p><p><b>المهارات (Skills):</b> أسلوب عمل قابل لإعادة الاستخدام — جاهز من Anthropic أو مصمم خصيصًا لك.</p></div>
+  <div class="section"><h2>🏷️ مسرد المصطلحات</h2><div class="terms">
+    <div class="term"><b>نموذج لغوي كبير (LLM):</b> برنامج «قرأ» كمية هائلة من النصوص ويتوقع الكلمة التالية المناسبة، من دون أن «يفهم» بالمعنى الإنساني.</div>
+    <div class="term"><b>الأمر / الطلب (Prompt):</b> الجملة التي تكتبها للبرنامج توضّح فيها ما تريد بالضبط.</div>
+    <div class="term"><b>التقطيع (Tokenization):</b> تقسيم جملتك إلى قطع صغيرة يتعامل معها البرنامج.</div>
+    <div class="term"><b>التمثيل الرقمي (Embeddings):</b> تحويل كل قطعة نص إلى أرقام تقارب معناها.</div>
+    <div class="term"><b>نافذة السياق (Context Window):</b> كمية النص التي يقدر البرنامج يتذكرها بنفس المحادثة.</div>
+    <div class="term"><b>الهلوسة / الاختلاق (Hallucination):</b> إعطاء معلومة غير دقيقة بثقة تامة وكأنها صحيحة.</div>
+    <div class="term"><b>شات / كوورك / كود:</b> محادثة سريعة، أو تنفيذ مهام أكبر باللمّات، أو أداة برمجة كاملة الوظيفة.</div>
+  </div></div>
+</div>
+</body>
+</html>

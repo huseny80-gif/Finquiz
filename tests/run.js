@@ -129,9 +129,9 @@ group('محرّك الأسئلة التفاعلية');
 
 const allQuestions = DLP.store.subjects().flatMap((s) => s.quizzes.flatMap((q) => q.questions));
 
-test('كل الأنواع الخمسة ممثّلة في البيانات', () => {
+test('كل الأنواع الستة ممثّلة في البيانات', () => {
   const types = new Set(allQuestions.map((q) => q.type));
-  ['mcq', 'tf', 'fill', 'match', 'order'].forEach((type) => assert(types.has(type), 'النوع مفقود: ' + type));
+  ['mcq', 'tf', 'fill', 'match', 'order', 'open'].forEach((type) => assert(types.has(type), 'النوع مفقود: ' + type));
 });
 
 test('كل سؤال يحمل مستوى صعوبة صالحاً وتفسيراً', () => {
@@ -156,12 +156,15 @@ test('بنية كل نوع سؤال صحيحة', () => {
       q.pairs.forEach((p) => assert(p.left && p.right, q.id + ': زوج ناقص'));
     } else if (q.type === 'order') {
       assert(Array.isArray(q.items) && q.items.length >= 3, q.id + ': عناصر ترتيب ناقصة');
+    } else if (q.type === 'open') {
+      assert(Array.isArray(q.rubric) && q.rubric.length > 0, q.id + ': معايير تقييم ناقصة');
+      q.rubric.forEach((point) => assert(point.text && point.text.length > 3, q.id + ': نقطة معيار ناقصة'));
     }
   });
 });
 
-test('التصحيح صحيح لكل نوع عند الإجابة الصحيحة', () => {
-  allQuestions.forEach((q) => {
+test('التصحيح صحيح لكل نوع مُصحَّح آلياً عند الإجابة الصحيحة', () => {
+  allQuestions.filter((q) => q.type !== 'open').forEach((q) => {
     let response;
     if (q.type === 'mcq') { response = q.answer; }
     else if (q.type === 'tf') { response = q.answer; }
@@ -175,7 +178,7 @@ test('التصحيح صحيح لكل نوع عند الإجابة الصحيحة
 });
 
 test('التصحيح يرفض الإجابات الخاطئة', () => {
-  allQuestions.forEach((q) => {
+  allQuestions.filter((q) => q.type !== 'open').forEach((q) => {
     let response;
     if (q.type === 'mcq') { response = (q.answer + 1) % q.options.length; }
     else if (q.type === 'tf') { response = String(!q.answer); }
@@ -184,6 +187,22 @@ test('التصحيح يرفض الإجابات الخاطئة', () => {
     else if (q.type === 'order') { response = q.items.slice().reverse(); }
     const result = DLP.quiz.grade(q, response);
     assert(!result.correct, q.id + ': إجابة خاطئة صُحّحت كصحيحة');
+  });
+});
+
+test('السؤال المفتوح: يُحتسب answered بكتابة نص، ولا "correct" آلياً أبداً', () => {
+  const openQuestions = allQuestions.filter((q) => q.type === 'open');
+  assert(openQuestions.length > 0, 'لا توجد أسئلة مفتوحة لاختبارها');
+  openQuestions.forEach((q) => {
+    const withText = DLP.quiz.grade(q, 'إجابة تأملية مكتوبة من الدارس بأسلوبه الخاص');
+    assert(withText.answered, q.id + ': نص غير فارغ يجب أن يُحتسب answered');
+    assert(!withText.correct, q.id + ': السؤال المفتوح لا يجب أن يُصحَّح "صحيحاً" آلياً');
+
+    const empty = DLP.quiz.grade(q, '   ');
+    assert(!empty.answered, q.id + ': نص فارغ (مسافات فقط) يجب ألا يُحتسب answered');
+
+    const none = DLP.quiz.grade(q, null);
+    assert(!none.answered, q.id + ': بلا إجابة يجب ألا يُحتسب answered');
   });
 });
 
@@ -200,10 +219,11 @@ test('السؤال غير المُجاب لا يُحتسب صحيحاً', () => 
   assert(!result.answered && !result.correct, 'سؤال بلا إجابة يجب ألا يُحتسب');
 });
 
-test('حساب النتيجة والنسبة المئوية صحيح', () => {
-  const quiz = DLP.store.getSubject('ai-data').quizzes[0];
+test('حساب النتيجة والنسبة المئوية صحيح (على الأسئلة القابلة للتصحيح الآلي)', () => {
+  const quiz = DLP.store.getSubject('risk-management').quizzes[0];
+  const gradable = quiz.questions.filter((q) => q.type !== 'open');
   const responses = {};
-  quiz.questions.forEach((q, i) => {
+  gradable.forEach((q, i) => {
     if (i % 2 === 0) {
       if (q.type === 'mcq') { responses[q.id] = q.answer; }
       else if (q.type === 'tf') { responses[q.id] = q.answer; }
@@ -212,11 +232,23 @@ test('حساب النتيجة والنسبة المئوية صحيح', () => {
       else if (q.type === 'order') { responses[q.id] = q.items.slice(); }
     }
   });
-  const expectedCorrect = quiz.questions.filter((q, i) => i % 2 === 0).length;
+  const expectedCorrect = gradable.filter((q, i) => i % 2 === 0).length;
   const score = DLP.quiz.score(quiz.questions, responses);
-  equal(score.total, quiz.questions.length, 'الإجمالي');
+  equal(score.total, gradable.length, 'الإجمالي القابل للتصحيح (بلا أسئلة مفتوحة في هذه المادة)');
   equal(score.correct, expectedCorrect, 'عدد الصحيح');
-  equal(score.percent, Math.round((expectedCorrect / quiz.questions.length) * 100), 'النسبة');
+  equal(score.percent, Math.round((expectedCorrect / gradable.length) * 100), 'النسبة');
+});
+
+test('score() يستثني الأسئلة المفتوحة من النسبة لكنه يُحصيها ضمن answered', () => {
+  const quiz = DLP.store.subjects().flatMap((s) => s.quizzes).find((q) => q.questions.some((x) => x.type === 'open'));
+  assert(quiz, 'لا يوجد اختبار يحوي سؤالاً مفتوحاً');
+  const openQuestion = quiz.questions.find((q) => q.type === 'open');
+  const gradableCount = quiz.questions.filter((q) => q.type !== 'open').length;
+
+  const withOpenAnswered = DLP.quiz.score(quiz.questions, { [openQuestion.id]: 'إجابة تأملية' });
+  equal(withOpenAnswered.total, gradableCount, 'الإجمالي القابل للتصحيح يستثني المفتوح');
+  equal(withOpenAnswered.correct, 0, 'لا شيء صحيحاً بعد لأن باقي الأسئلة بلا إجابة');
+  equal(withOpenAnswered.answered, 1, 'answered يشمل السؤال المفتوح رغم استثنائه من النسبة');
 });
 
 test('تصفية الأسئلة حسب الصعوبة تعمل', () => {
@@ -407,7 +439,7 @@ test('كل ملفات السكربت المشار إليها في index.html م�
 });
 
 test('كل إعلان تجريبي موسوم بوضوح', () => {
-  const realIds = ['ai-u4', 'lg-u3', 'ip-u3'];
+  const realIds = ['ai-u4', 'ai-u5', 'lg-u3', 'lg-u4', 'ip-u3', 'ip-u4'];
   DLP.store.subjects().forEach((subject) => {
     DLP.store.list(subject, 'updates').forEach((update) => {
       const isReal = realIds.indexOf(update.id) !== -1;

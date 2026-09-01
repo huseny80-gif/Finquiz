@@ -186,9 +186,30 @@
       '</ol>';
   }
 
-  var BODY_RENDERERS = { mcq: renderMcq, tf: renderTf, fill: renderFill, match: renderMatch, order: renderOrder };
+  function renderOpen(state, question) {
+    var response = state.responses[question.id] || '';
+    var checked = state.checked[question.id];
+    return '<label class="visually-hidden" for="open-' + esc(question.id) + '">' + esc(t('quiz.openPlaceholder')) + '</label>' +
+      '<textarea class="open-input" id="open-' + esc(question.id) + '" data-answer="open" rows="5" autocomplete="off"' +
+      ' placeholder="' + esc(t('quiz.openPlaceholder')) + '"' + (checked ? ' disabled' : '') + '>' + esc(response) + '</textarea>';
+  }
+
+  var BODY_RENDERERS = { mcq: renderMcq, tf: renderTf, fill: renderFill, match: renderMatch, order: renderOrder, open: renderOpen };
 
   /* ------------------------- رسم الاختبار ------------------------- */
+
+  /** معايير التقييم الذاتي لسؤال مفتوح (سيناريو/مقالي) — نقاط + كلمات مفتاحية إرشادية. */
+  function renderRubric(question) {
+    var points = question.rubric || [];
+    if (!points.length) { return '<div><b>' + esc(t('quiz.explanation')) + ':</b> ' + esc(question.explanation || '') + '</div>'; }
+    return '<ol class="detail-list">' +
+      points.map(function (point) {
+        var keywords = point.keywords && point.keywords.length
+          ? ' <span class="kw-hint">(' + esc(point.keywords.join(t('common.listSeparator'))) + ')</span>' : '';
+        return '<li>' + esc(point.text) + keywords + '</li>';
+      }).join('') +
+    '</ol>';
+  }
 
   function renderQuestion(state) {
     var question = current(state);
@@ -196,23 +217,33 @@
       return '<div class="empty-state"><p>' + esc(t('quiz.noneAtLevel')) + '</p></div>';
     }
     var checked = state.checked[question.id];
+    var isOpen = question.type === 'open';
     var graded = checked ? DLP.quiz.grade(question, state.responses[question.id]) : null;
+
+    var feedbackClass = '';
+    var feedbackBody = '';
+    if (checked) {
+      if (isOpen) {
+        feedbackClass = 'info show';
+        feedbackBody = '<div class="fb-title">📋 ' + esc(t('quiz.openReveal')) + '</div>' + renderRubric(question);
+      } else {
+        feedbackClass = graded.correct ? 'ok show' : 'bad show';
+        feedbackBody = '<div class="fb-title">' + (graded.correct ? '✓ ' + esc(t('quiz.correct')) : '✕ ' + esc(t('quiz.wrong'))) + '</div>' +
+          (graded.correct ? '' : '<div class="fb-answer">' + esc(t('quiz.correctAnswer')) + ': ' + esc(graded.correctAnswer) + '</div>') +
+          '<div><b>' + esc(t('quiz.explanation')) + ':</b> ' + esc(question.explanation) + '</div>';
+      }
+    }
 
     return '' +
       '<div class="q-prompt">' +
         '<span class="qnum">' + esc(t('quiz.question')) + ' ' + (state.index + 1) + '/' + state.questions.length + '</span>' +
         '<span class="badge badge-' + esc(question.difficulty || 'medium') + '">' +
-          esc(t('difficulty.' + (question.difficulty || 'medium'))) + '</span><br>' +
-        esc(question.prompt) +
+          esc(t('difficulty.' + (question.difficulty || 'medium'))) + '</span>' +
+        (isOpen ? '<span class="badge badge-type">' + esc(t('quiz.openTag')) + '</span>' : '') +
+        '<br>' + esc(question.prompt) +
       '</div>' +
       BODY_RENDERERS[question.type](state, question) +
-      '<div class="feedback ' + (checked ? (graded.correct ? 'ok show' : 'bad show') : '') + '" role="status" aria-live="polite">' +
-        (checked
-          ? '<div class="fb-title">' + (graded.correct ? '✓ ' + esc(t('quiz.correct')) : '✕ ' + esc(t('quiz.wrong'))) + '</div>' +
-            (graded.correct ? '' : '<div class="fb-answer">' + esc(t('quiz.correctAnswer')) + ': ' + esc(graded.correctAnswer) + '</div>') +
-            '<div><b>' + esc(t('quiz.explanation')) + ':</b> ' + esc(question.explanation) + '</div>'
-          : '') +
-      '</div>';
+      '<div class="feedback ' + feedbackClass + '" role="status" aria-live="polite">' + feedbackBody + '</div>';
   }
 
   function renderProgress(state) {
@@ -247,11 +278,12 @@
   function renderFoot(state) {
     var question = current(state);
     var isLast = state.index === state.questions.length - 1;
+    var checkLabel = question && question.type === 'open' ? t('quiz.reveal') : t('quiz.check');
     return '' +
       '<button class="btn btn-ghost btn-sm" type="button" data-quiz-action="prev"' +
         (state.index === 0 ? ' disabled' : '') + '>→ ' + esc(t('quiz.prev')) + '</button>' +
       '<button class="btn btn-primary btn-sm" type="button" data-quiz-action="check"' +
-        (!question || state.checked[question.id] ? ' disabled' : '') + '>' + esc(t('quiz.check')) + '</button>' +
+        (!question || state.checked[question.id] ? ' disabled' : '') + '>' + esc(checkLabel) + '</button>' +
       '<span class="spacer"></span>' +
       (isLast
         ? '<button class="btn btn-gold btn-sm" type="button" data-quiz-action="finish">' + esc(t('quiz.finish')) + '</button>'
@@ -386,7 +418,7 @@
 
     panel.addEventListener('input', function (event) {
       var target = event.target;
-      if (target.dataset && target.dataset.answer === 'fill') {
+      if (target.dataset && (target.dataset.answer === 'fill' || target.dataset.answer === 'open')) {
         var context = stateFromEvent(subject, target);
         if (!context) { return; }
         var question = current(context.state);

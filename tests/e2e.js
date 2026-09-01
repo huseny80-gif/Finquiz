@@ -209,7 +209,8 @@ function group(name) { console.log('\n▶ ' + name); }
   });
 
   await test('سؤال صح/خطأ يعمل', async () => {
-    await open(base + '#/subject/ai-data/quizzes');
+    // ai-data صار محتوى حقيقي بأنواع mcq/tf/open فقط؛ نستخدم risk-management (تجريبي، بالأنواع الخمسة الأصلية)
+    await open(base + '#/subject/risk-management/quizzes');
     await page.click('[data-quiz-action="next"]');
     await page.waitForSelector('.opt[data-value="false"]');
     await page.click('.opt[data-value="false"]');
@@ -218,28 +219,33 @@ function group(name) { console.log('\n▶ ' + name); }
   });
 
   await test('سؤال إكمال الفراغ يقبل الإجابة النصية', async () => {
-    await open(base + '#/subject/ai-data/quizzes');
+    await open(base + '#/subject/risk-management/quizzes');
     await page.click('[data-quiz-action="next"]');
     await page.click('[data-quiz-action="next"]');
     await page.waitForSelector('.fill-input');
-    await page.fill('.fill-input', 'التنبؤي');
+    await page.fill('.fill-input', 'الأثر');
     await page.click('[data-quiz-action="check"]');
     assert((await page.textContent('.feedback')).includes('إجابة صحيحة'), 'تصحيح إكمال الفراغ');
   });
 
   await test('سؤال المطابقة يعمل عبر القوائم المنسدلة', async () => {
-    await open(base + '#/subject/ai-data/quizzes');
+    await open(base + '#/subject/risk-management/quizzes');
     for (let i = 0; i < 3; i++) { await page.click('[data-quiz-action="next"]'); }
     await page.waitForSelector('.match-select');
     const rows = await page.$$('.match-select');
-    const answers = ['ماذا حدث؟', 'لماذا حدث؟', 'ماذا سيحدث؟', 'ماذا ينبغي أن نفعل؟'];
+    const answers = [
+      'إلغاء نشاط عالي الخطورة من خطة المشروع',
+      'تفعيل نسخ احتياطي دوري لتقليل أثر فقدان البيانات',
+      'التأمين على الأصول أو التعاقد مع طرف متخصص',
+      'تحمّل خطر منخفض الأثر لأن كلفة معالجته أعلى منه'
+    ];
     for (let i = 0; i < rows.length; i++) { await rows[i].selectOption(answers[i]); }
     await page.click('[data-quiz-action="check"]');
     assert((await page.textContent('.feedback')).includes('إجابة صحيحة'), 'تصحيح المطابقة');
   });
 
   await test('سؤال الترتيب يعمل عبر أزرار التحريك', async () => {
-    await open(base + '#/subject/ai-data/quizzes');
+    await open(base + '#/subject/risk-management/quizzes');
     for (let i = 0; i < 4; i++) { await page.click('[data-quiz-action="next"]'); }
     await page.waitForSelector('.order-item');
     // الترتيب الافتراضي في البيانات صحيح — نبدّل عنصرين ثم نعيدهما للتأكد من عمل الأزرار
@@ -266,6 +272,28 @@ function group(name) { console.log('\n▶ ' + name); }
     await page.click('[data-quiz-filter="hard"]');
     assert(await page.getAttribute('[data-quiz-filter="hard"]', 'aria-pressed') === 'true', 'الفلتر غير نشط');
     assert((await page.textContent('.q-prompt')).includes('صعب'), 'السؤال المعروض ليس صعباً');
+  });
+
+  await test('السؤال المفتوح: نص حر ثم كشف معايير التقييم بلا صح/خطأ', async () => {
+    await open(base + '#/subject/ai-data/quizzes');
+    await page.click('[data-quiz-filter="hard"]');   // كل الأسئلة المفتوحة في ai-data صعبة حصراً
+    await page.waitForSelector('.open-input');
+    assert((await page.textContent('.q-prompt')).includes('سؤال مفتوح'), 'وسم السؤال المفتوح مفقود');
+    await page.fill('.open-input', 'إجابة تأملية يكتبها الدارس بأسلوبه الخاص للمراجعة الذاتية.');
+    await page.click('[data-quiz-action="check"]');
+    const feedback = await page.textContent('.feedback');
+    assert(feedback.includes('معايير الإجابة النموذجية'), 'لم تُكشف معايير التقييم');
+    assert(!feedback.includes('✓') && !feedback.includes('✕'), 'لا يجوز عرض صح/خطأ آلي لسؤال مفتوح');
+    const infoClass = await page.getAttribute('.feedback', 'class');
+    assert(infoClass.includes('info'), 'يجب أن تكون التغذية الراجعة محايدة (info) لا ok/bad');
+  });
+
+  await test('زر الكشف يحمل تسمية مختلفة للأسئلة المفتوحة', async () => {
+    await open(base + '#/subject/ai-data/quizzes');
+    await page.click('[data-quiz-filter="hard"]');
+    await page.waitForSelector('.open-input');
+    const label = await page.textContent('[data-quiz-action="check"]');
+    assert(label.includes('معايير التقييم'), 'زر الكشف لا يحمل التسمية المخصّصة للسؤال المفتوح: ' + label);
   });
 
   await test('تقدّم الاختبار يُحفظ بعد إعادة تحميل الصفحة', async () => {
