@@ -203,21 +203,21 @@
       },
       {
         id: 'ai-r2', type: 'pdf', status: 'published',
-        title: 'مقرر مادة الذكاء الاصطناعي — المقرر المعتمد',
+        title: 'مقرر الذكاء الاصطناعي — الأسبوع الأول والثاني',
         author: null, year: null, publisher: null,
-        url: 'files/ai-data/course-handbook.pdf',
-        note: 'المقرر الكامل للمادة كما زُوّدت به المنصة.'
+        url: 'files/ai-data/Ai-week1-week2.pdf',
+        note: 'مقرر المادة للأسبوعين الأول والثاني كما زُوّدت به المنصة.'
       }
     ],
 
     resources: [
-      { id: 'ai-f1', type: 'pdf',   title: 'مقرر مادة الذكاء الاصطناعي (المقرر الكامل)', date: '2026-09-01', url: 'files/ai-data/course-handbook.pdf', status: 'published' },
+      { id: 'ai-f1', type: 'pdf',   title: 'مقرر الذكاء الاصطناعي — الأسبوع الأول والثاني', date: '2026-09-01', url: 'files/ai-data/Ai-week1-week2.pdf', status: 'published' },
       { id: 'ai-f2', type: 'xlsx',  title: 'جدول بيانات تدريبي للتمرين',   date: '2026-08-18', url: null, status: 'published', demo: true },
       { id: 'ai-f3', type: 'pptx',  title: 'عرض مستويات التحليل الأربعة',  date: '2026-08-17', url: null, status: 'published', demo: true }
     ],
 
     updates: [
-      { id: 'ai-u4', date: '2026-09-01', type: 'resource', title: 'رفع مقرر المادة الكامل', body: 'أُضيف ملف مقرر مادة الذكاء الاصطناعي إلى قسمي الملفات والمراجع.', status: 'published' },
+      { id: 'ai-u4', date: '2026-09-01', type: 'resource', title: 'رفع مقرر الأسبوع الأول والثاني', body: 'أُضيف ملف مقرر الذكاء الاصطناعي (الأسبوع الأول والثاني) إلى قسمي الملفات والمراجع.', status: 'published' },
       { id: 'ai-u1', date: '2026-08-18', type: 'assignment', title: 'إضافة تمرين تصميم لوحة المؤشرات', body: 'أُضيف تمرين جديد بمستوى متوسط مع نموذج تسليم.', status: 'published' },
       { id: 'ai-u2', date: '2026-08-17', type: 'lecture',    title: 'إضافة المحاضرة الثانية',          body: 'نُشرت محاضرة دورة حياة تحليل البيانات واتخاذ القرار.', status: 'published' },
       { id: 'ai-u3', date: '2026-08-10', type: 'general',    title: 'افتتاح تبويب المادة',             body: 'تم إنشاء تبويب المادة وتفعيل أقسامه السبعة.', status: 'published' }

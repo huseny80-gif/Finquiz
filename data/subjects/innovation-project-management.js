@@ -30,7 +30,7 @@
           'إدراك اختلاف مهارات وأدوات إدارة المشاريع الرقمية عن إدارة المشاريع التقليدية.'
         ],
         files: [
-          { type: 'pdf',  label: 'ملف المحاضرة (PDF)', url: 'files/innovation-project-management/lecture-01.pdf' },
+          { type: 'pdf',  label: 'ملف المحاضرة (PDF)', url: 'files/innovation-project-management/Innovation1.pdf' },
           { type: 'pptx', label: 'العرض التقديمي (PowerPoint)', url: null }
         ]
       },
@@ -164,7 +164,7 @@
     ],
 
     resources: [
-      { id: 'ip-f1', type: 'pdf',  title: 'المحاضرة الأولى — الابتكار وإدارة المشاريع الرقمية', date: '2026-09-01', url: 'files/innovation-project-management/lecture-01.pdf', status: 'published' },
+      { id: 'ip-f1', type: 'pdf',  title: 'المحاضرة الأولى — الابتكار وإدارة المشاريع الرقمية', date: '2026-09-01', url: 'files/innovation-project-management/Innovation1.pdf', status: 'published' },
       { id: 'ip-f2', type: 'docx', title: 'نموذج ميثاق مشروع',     date: '2026-08-16', url: null, status: 'published', demo: true }
     ],
 

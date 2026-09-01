@@ -30,7 +30,7 @@
           'إدراك دور الرقابة والشفافية في الإدارة الإلكترونية ومعوقات التحول.'
         ],
         files: [
-          { type: 'pdf',  label: 'ملف المحاضرة (PDF)', url: 'files/legal-regulatory/lecture-01.pdf' },
+          { type: 'pdf',  label: 'ملف المحاضرة (PDF)', url: 'files/legal-regulatory/Legal1.pdf' },
           { type: 'link', label: 'الملخص التفاعلي للمحاضرة', url: 'files/legal-regulatory/summary-01.html' },
           { type: 'pptx', label: 'العرض التقديمي (PowerPoint)', url: null }
         ]
@@ -172,7 +172,7 @@
     ],
 
     resources: [
-      { id: 'lg-f1', type: 'pdf',  title: 'المحاضرة الأولى — التحول الإلكتروني وأثره في الإدارة والوظيفة العامة', date: '2026-09-01', url: 'files/legal-regulatory/lecture-01.pdf', status: 'published' },
+      { id: 'lg-f1', type: 'pdf',  title: 'المحاضرة الأولى — التحول الإلكتروني وأثره في الإدارة والوظيفة العامة', date: '2026-09-01', url: 'files/legal-regulatory/Legal1.pdf', status: 'published' },
       { id: 'lg-f3', type: 'link', title: 'الملخص التفاعلي للمحاضرة الأولى', date: '2026-09-01', url: 'files/legal-regulatory/summary-01.html', status: 'published' },
       { id: 'lg-f2', type: 'docx', title: 'ورقة الحالة للتمرين',   date: '2026-08-14', url: null, status: 'published', demo: true }
     ],
