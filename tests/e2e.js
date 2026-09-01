@@ -316,12 +316,16 @@ function group(name) { console.log('\n▶ ' + name); }
     equal(tag, 'H1', 'التركيز لم ينتقل إلى العنوان');
   });
 
-  await test('تغيّر الصفحة يُعلَن لقارئ الشاشة', async () => {
-    await page.goto(base + '#/about', { waitUntil: 'domcontentloaded' });
-    await page.waitForFunction(() => document.getElementById('routeAnnouncer').textContent.length > 0,
+  await test('تغيّر الصفحة يُعلَن لقارئ الشاشة بلا بقايا من الصفحة السابقة', async () => {
+    // نبدأ من مادة حتى يحمل الإعلان نصاً سابقاً، ثم ننتقل لصفحة أخرى
+    await open(base + '#/subject/ai-data/lectures');
+    await page.waitForFunction(() => document.getElementById('routeAnnouncer').textContent.includes('المحاضرات'),
+      null, { timeout: 3000 });
+    await page.click('.nav-link[href="#/about"]');
+    await page.waitForFunction(() => document.getElementById('routeAnnouncer').textContent.includes('من نحن'),
       null, { timeout: 3000 });
     const text = await page.textContent('#routeAnnouncer');
-    assert(text.includes('من نحن'), 'الإعلان لا يذكر الصفحة: ' + text);
+    assert(!text.includes('المحاضرات'), 'بقي إعلان الصفحة السابقة: ' + text);
   });
 
   await test('التبويبات تطبّق roving tabindex', async () => {

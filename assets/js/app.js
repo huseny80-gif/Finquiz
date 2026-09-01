@@ -30,6 +30,9 @@
 
   function paint(html, focusSelector) {
     var main = el('main');
+    // مسح إعلان الصفحة السابقة فوراً وتزامنياً حتى لا يُقرأ نص قديم أثناء الانتقال
+    var announcer = el('routeAnnouncer');
+    if (announcer) { announcer.textContent = ''; }
     main.innerHTML = html;
     DLP.layout.syncActiveNav(DLP.router.getCurrent() ? DLP.router.getCurrent().path : '/');
     if (focusSelector) {
