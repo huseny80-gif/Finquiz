@@ -439,7 +439,7 @@ test('كل ملفات السكربت المشار إليها في index.html م�
 });
 
 test('كل إعلان تجريبي موسوم بوضوح', () => {
-  const realIds = ['ai-u4', 'ai-u5', 'lg-u3', 'lg-u4', 'ip-u3', 'ip-u4'];
+  const realIds = ['ai-u4', 'ai-u5', 'lg-u3', 'lg-u4', 'lg-u5', 'ip-u3', 'ip-u4', 'ip-u5', 'cs-u3'];
   DLP.store.subjects().forEach((subject) => {
     DLP.store.list(subject, 'updates').forEach((update) => {
       const isReal = realIds.indexOf(update.id) !== -1;
