@@ -40,6 +40,11 @@
           "type": "link",
           "label": "أقسام المحاضرة الكاملة ومسرد المصطلحات (مصدر إضافي)",
           "url": "files/innovation-project-management/lecture-01-content.html"
+        },
+        {
+          "type": "link",
+          "label": "الملخص التفاعلي للمحاضرة",
+          "url": "files/innovation-project-management/summary-01.html"
         }
       ]
     },
@@ -245,6 +250,11 @@
           "type": "link",
           "label": "محتوى المحاضرة الكامل (يشمل هذا الملخص)",
           "url": "files/innovation-project-management/lecture-01-content.html"
+        },
+        {
+          "type": "link",
+          "label": "الملخص التفاعلي الكامل (HTML)",
+          "url": "files/innovation-project-management/summary-01.html"
         }
       ]
     },
@@ -939,9 +949,25 @@
       "date": "2026-09-02",
       "url": "files/innovation-project-management/Innovation2.pdf",
       "status": "published"
+    },
+    {
+      "id": "ip-f4",
+      "type": "link",
+      "title": "الملخص التفاعلي للمحاضرة الأولى",
+      "date": "2026-09-02",
+      "url": "files/innovation-project-management/summary-01.html",
+      "status": "published"
     }
   ],
   "updates": [
+    {
+      "id": "ip-u6",
+      "date": "2026-09-02",
+      "type": "resource",
+      "title": "إضافة الملخص التفاعلي للمحاضرة الأولى",
+      "body": "أُضيفت صفحة ملخص تفاعلية (ملخص تنفيذي + تفصيل كامل + اختبار ذاتي من ١٦ سؤالاً) للمحاضرة الأولى.",
+      "status": "published"
+    },
     {
       "id": "ip-u5",
       "date": "2026-09-02",

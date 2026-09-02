@@ -27,7 +27,8 @@
         files: [
           { type: 'pdf',  label: 'ملف المحاضرة (PDF)', url: 'files/cybersecurity-governance/Cybersecurity1.pdf' },
           { type: 'pptx', label: 'العرض التقديمي (PowerPoint)', url: null },
-          { type: 'link', label: 'أقسام المحاضرة الكاملة ومسرد المصطلحات (مصدر إضافي)', url: 'files/cybersecurity-governance/lecture-01-content.html' }
+          { type: 'link', label: 'أقسام المحاضرة الكاملة ومسرد المصطلحات (مصدر إضافي)', url: 'files/cybersecurity-governance/lecture-01-content.html' },
+          { type: 'link', label: 'الملخص التفاعلي للمحاضرة', url: 'files/cybersecurity-governance/summary-01.html' }
         ]
       },
       {
@@ -64,7 +65,10 @@
           { term: 'حوكمة أمن المعلومات',        definition: 'الإطار الذي يحدد من خلاله مجلس الإدارة والإدارة التنفيذية التوجهات والأهداف والمسؤوليات المتعلقة بأمن المعلومات.' }
         ],
         terms: ['الخطر (Risk)', 'التهديد (Threat)', 'الثغرة (Vulnerability)', 'CISO', 'الامتثال (Compliance)', 'NIST CSF', 'ISO/IEC 27001'],
-        files: [{ type: 'link', label: 'محتوى المحاضرة الكامل (يشمل هذا الملخص)', url: 'files/cybersecurity-governance/lecture-01-content.html' }]
+        files: [
+          { type: 'link', label: 'محتوى المحاضرة الكامل (يشمل هذا الملخص)', url: 'files/cybersecurity-governance/lecture-01-content.html' },
+          { type: 'link', label: 'الملخص التفاعلي الكامل (HTML)', url: 'files/cybersecurity-governance/summary-01.html' }
+        ]
       },
       {
         id: 'cs-s2', lectureId: 'cs-l2', title: 'ملخص المحاضرة الثانية — السياسات وإدارة الحوادث', date: '2026-08-20', status: 'published', demo: true,
@@ -281,10 +285,12 @@
       { id: 'cs-f1', type: 'pdf',   title: 'حقيبة المحاضرة الأولى',     date: '2026-08-12', url: null, status: 'published', demo: true },
       { id: 'cs-f2', type: 'xlsx',  title: 'قالب مصفوفة RACI',          date: '2026-08-15', url: null, status: 'published', demo: true },
       { id: 'cs-f3', type: 'image', title: 'مخطط دورة الاستجابة للحوادث', date: '2026-08-19', url: null, status: 'published', demo: true },
-      { id: 'cs-f4', type: 'pdf',   title: 'المحاضرة الأولى — مقدمة في الأمن السيبراني وحوكمة أمن المعلومات', date: '2026-09-02', url: 'files/cybersecurity-governance/Cybersecurity1.pdf', status: 'published' }
+      { id: 'cs-f4', type: 'pdf',   title: 'المحاضرة الأولى — مقدمة في الأمن السيبراني وحوكمة أمن المعلومات', date: '2026-09-02', url: 'files/cybersecurity-governance/Cybersecurity1.pdf', status: 'published' },
+      { id: 'cs-f5', type: 'link',  title: 'الملخص التفاعلي للمحاضرة الأولى', date: '2026-09-02', url: 'files/cybersecurity-governance/summary-01.html', status: 'published' }
     ],
 
     updates: [
+      { id: 'cs-u4', date: '2026-09-02', type: 'resource', title: 'إضافة الملخص التفاعلي للمحاضرة الأولى', body: 'أُضيفت صفحة ملخص تفاعلية (ملخص تنفيذي + تفصيل كامل + اختبار ذاتي من ١٨ سؤالاً) للمحاضرة الأولى.', status: 'published' },
       { id: 'cs-u3', date: '2026-09-02', type: 'lecture', title: 'رفع المحاضرة الأولى الفعلية وإثراء الأسئلة', body: 'استُبدل محتوى المحاضرة الأولى بمحتوى حقيقي (مقدمة في الأمن السيبراني وحوكمة أمن المعلومات)، وأُضيفت 9 أسئلة تفاعلية جديدة و4 تمارين.', status: 'published' },
       { id: 'cs-u1', date: '2026-08-21', type: 'quiz',    title: 'تحديث بنك أسئلة المادة', body: 'أُضيفت أسئلة ترتيب ومطابقة إلى اختبار المادة.', status: 'published', demo: true },
       { id: 'cs-u2', date: '2026-08-19', type: 'lecture', title: 'إضافة المحاضرة الثانية', body: 'نُشرت محاضرة السياسات وإدارة الحوادث السيبرانية.', status: 'published', demo: true }
