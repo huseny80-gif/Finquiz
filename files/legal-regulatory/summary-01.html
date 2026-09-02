@@ -1187,6 +1187,11 @@
         </div>
       </div>
 
+      <div class="quiz-options-group hidden" id="qlecture-wrap">
+        <label class="qg-label">٤. اختر المحاضرة</label>
+        <div class="pill-row" id="qlecture-group"></div>
+      </div>
+
       <button class="start-btn" onclick="startQuiz()">ابدأ الاختبار ▶</button>
     </div>
 
@@ -1426,6 +1431,25 @@
   let answered = false;
   let axisStats = {};
 
+  (function initLectureFilter(){
+    const lectures = [];
+    QUESTION_BANK.forEach(q => {
+      const lec = q.lecture || 1;
+      const label = q.lectureLabel || "المحاضرة الأولى";
+      if(!lectures.find(l => l.lecture === lec)) lectures.push({lecture:lec, label:label});
+    });
+    lectures.sort((a,b) => a.lecture - b.lecture);
+    if(lectures.length > 1){
+      const group = document.getElementById('qlecture-group');
+      let html = '<label class="pill"><input type="radio" name="qlecture" value="all" checked><span>كل المحاضرات</span></label>';
+      lectures.forEach(l => {
+        html += '<label class="pill"><input type="radio" name="qlecture" value="' + l.lecture + '"><span>' + l.label + '</span></label>';
+      });
+      group.innerHTML = html;
+      document.getElementById('qlecture-wrap').classList.remove('hidden');
+    }
+  })();
+
   function shuffle(arr){
     const a = arr.slice();
     for(let i=a.length-1;i>0;i--){
@@ -1457,6 +1481,11 @@
       pool = pool.filter(q => q.type === "scenario");
     }
     // "mixed_all" => no filtering, keep every type
+
+    const lectureInput = document.querySelector('input[name="qlecture"]:checked');
+    if(lectureInput && lectureInput.value !== "all"){
+      pool = pool.filter(q => String(q.lecture || 1) === lectureInput.value);
+    }
 
     pool = shuffle(pool);
 
