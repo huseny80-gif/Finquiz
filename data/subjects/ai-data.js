@@ -36,6 +36,11 @@
           "type": "link",
           "label": "محتوى المحاضرة الكامل (أقسام + مسرد)",
           "url": "files/ai-data/lecture-01-content.html"
+        },
+        {
+          "type": "link",
+          "label": "الملخص التفاعلي للمحاضرة",
+          "url": "files/ai-data/summary-01.html"
         }
       ]
     },
@@ -125,6 +130,11 @@
           "type": "link",
           "label": "محتوى المحاضرة الكامل (يشمل هذا الملخص)",
           "url": "files/ai-data/lecture-01-content.html"
+        },
+        {
+          "type": "link",
+          "label": "الملخص التفاعلي الكامل (HTML)",
+          "url": "files/ai-data/summary-01.html"
         }
       ]
     },
@@ -1194,9 +1204,25 @@
       "url": null,
       "status": "published",
       "demo": true
+    },
+    {
+      "id": "ai-f4",
+      "type": "link",
+      "title": "الملخص التفاعلي للمحاضرة الأولى",
+      "date": "2026-09-02",
+      "url": "files/ai-data/summary-01.html",
+      "status": "published"
     }
   ],
   "updates": [
+    {
+      "id": "ai-u6",
+      "date": "2026-09-02",
+      "type": "resource",
+      "title": "إضافة الملخص التفاعلي للمحاضرة الأولى",
+      "body": "أُضيفت صفحة ملخص تفاعلية (ملخص تنفيذي + تفصيل كامل + اختبار ذاتي من ١٧ سؤالاً) للمحاضرة الأولى.",
+      "status": "published"
+    },
     {
       "id": "ai-u5",
       "date": "2026-09-01",

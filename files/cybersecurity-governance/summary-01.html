@@ -1,0 +1,1317 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>مقدمة في الأمن السيبراني وحوكمة أمن المعلومات</title>
+<style>
+  :root{
+    --navy:#0f2440;
+    --navy-2:#16345c;
+    --gold:#b8912f;
+    --gold-light:#e8d9ad;
+    --paper:#faf8f3;
+    --ink:#1f2a37;
+    --muted:#5b6674;
+    --line:#e3ddce;
+    --card:#ffffff;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{
+    font-family:"Tahoma","Segoe UI",Arial,sans-serif;
+    background:linear-gradient(180deg,#f3efe4 0%, var(--paper) 260px);
+    color:var(--ink);
+    line-height:1.9;
+  }
+
+  /* ===== Header ===== */
+  .site-header{
+    background:linear-gradient(120deg,var(--navy) 0%, var(--navy-2) 60%, #1d4270 100%);
+    color:#fff;
+    padding:38px 24px 30px;
+    position:relative;
+    overflow:hidden;
+    border-bottom:4px solid var(--gold);
+  }
+  .site-header::before{
+    content:"";
+    position:absolute;
+    inset:0;
+    background-image:
+      radial-gradient(circle at 90% 10%, rgba(184,145,47,0.25), transparent 45%),
+      radial-gradient(circle at 5% 90%, rgba(184,145,47,0.15), transparent 40%);
+    pointer-events:none;
+  }
+  .header-inner{max-width:1100px;margin:0 auto;position:relative;z-index:1;}
+  .eyebrow{
+    display:inline-block;
+    font-size:13px;
+    letter-spacing:1px;
+    background:rgba(255,255,255,0.12);
+    border:1px solid rgba(232,217,173,0.5);
+    color:var(--gold-light);
+    padding:5px 14px;
+    border-radius:20px;
+    margin-bottom:14px;
+  }
+  .site-header h1{
+    margin:0 0 8px;
+    font-size:30px;
+    font-weight:800;
+    letter-spacing:.3px;
+  }
+  .site-header h2{
+    margin:0 0 18px;
+    font-size:17px;
+    font-weight:400;
+    color:var(--gold-light);
+  }
+  .meta-row{
+    display:flex;
+    flex-wrap:wrap;
+    gap:10px 24px;
+    font-size:14px;
+    color:#e7e9ee;
+    border-top:1px solid rgba(255,255,255,0.18);
+    padding-top:14px;
+    margin-top:6px;
+  }
+  .meta-row span b{color:#fff;}
+
+  /* ===== Container ===== */
+  .wrap{max-width:1100px;margin:0 auto;padding:26px 20px 60px;}
+
+  /* ===== Tabs ===== */
+  .tabs-bar{
+    display:flex;
+    flex-direction:row;
+    flex-wrap:nowrap;
+    gap:8px;
+    overflow-x:auto;
+    background:var(--card);
+    border:1px solid var(--line);
+    border-radius:14px;
+    padding:8px;
+    box-shadow:0 6px 18px rgba(15,36,64,0.06);
+    margin-bottom:22px;
+    scrollbar-width:thin;
+  }
+  .tabs-bar::-webkit-scrollbar{height:6px;}
+  .tabs-bar::-webkit-scrollbar-thumb{background:var(--gold-light);border-radius:6px;}
+  .tab-btn{
+    flex:1 1 0;
+    white-space:nowrap;
+    min-width:200px;
+    text-align:center;
+    background:transparent;
+    border:none;
+    padding:14px 12px;
+    font-size:15px;
+    font-weight:700;
+    color:var(--muted);
+    cursor:pointer;
+    border-radius:10px;
+    transition:.2s;
+    font-family:inherit;
+  }
+  .tab-btn .sub{display:block;font-weight:400;font-size:12px;margin-top:4px;opacity:.85;white-space:normal;}
+  .tab-btn.active{
+    background:linear-gradient(120deg,var(--navy) 0%, var(--navy-2) 100%);
+    color:#fff;
+    box-shadow:0 4px 12px rgba(15,36,64,0.28);
+  }
+  .tab-btn:not(.active):hover{background:#f2ede0;color:var(--navy);}
+
+  .tab-panel{display:none;animation:fade .35s ease;}
+  .tab-panel.active{display:block;}
+  @keyframes fade{from{opacity:0;transform:translateY(6px);}to{opacity:1;transform:translateY(0);}}
+
+  /* ===== Document intro card ===== */
+  .doc-card{
+    background:var(--card);
+    border:1px solid var(--line);
+    border-radius:14px;
+    padding:22px 24px;
+    margin-bottom:22px;
+    box-shadow:0 6px 18px rgba(15,36,64,0.05);
+    border-inline-start:6px solid var(--gold);
+  }
+  .doc-card h3{margin:0 0 6px;color:var(--navy);font-size:20px;}
+  .doc-card p{margin:4px 0;color:var(--muted);font-size:14.5px;}
+
+  /* ===== Sections / Accordion-like cards ===== */
+  .section-card{
+    background:var(--card);
+    border:1px solid var(--line);
+    border-radius:14px;
+    margin-bottom:16px;
+    overflow:hidden;
+    box-shadow:0 4px 14px rgba(15,36,64,0.05);
+  }
+  .section-head{
+    display:flex;
+    align-items:center;
+    gap:14px;
+    padding:16px 20px;
+    background:#f6f2e6;
+    border-bottom:1px solid var(--line);
+  }
+  .section-num{
+    flex:0 0 auto;
+    width:38px;height:38px;
+    border-radius:50%;
+    background:var(--navy);
+    color:var(--gold-light);
+    display:flex;align-items:center;justify-content:center;
+    font-weight:800;
+    font-size:15px;
+  }
+  .section-head h4{
+    margin:0;
+    color:var(--navy-2);
+    font-size:18px;
+    font-weight:800;
+  }
+  .section-body{padding:18px 22px 20px;}
+  .section-body ul{margin:0;padding-inline-start:22px;}
+  .section-body li{margin-bottom:10px;font-size:15px;color:var(--ink);}
+  .section-body li::marker{color:var(--gold);font-weight:bold;}
+  .sub-list{margin-top:8px;padding-inline-start:20px;list-style:decimal;}
+  .sub-list li{margin-bottom:6px;font-size:14.5px;color:var(--ink);}
+  .example-box{
+    margin-top:10px;
+    background:#fbf6e9;
+    border:1px dashed var(--gold);
+    border-radius:10px;
+    padding:12px 16px;
+    font-size:14.5px;
+    color:#4a3c14;
+  }
+  .example-box b{color:var(--navy-2);}
+  .highlight{
+    background:linear-gradient(180deg,transparent 60%, var(--gold-light) 60%);
+    font-weight:700;
+  }
+  .rule-box{
+    background:linear-gradient(120deg,var(--navy) 0%, var(--navy-2) 100%);
+    color:#fff;
+    border-radius:14px;
+    padding:22px 24px;
+    margin-top:6px;
+    text-align:center;
+    box-shadow:0 8px 20px rgba(15,36,64,0.25);
+  }
+  .rule-box .tag{
+    display:inline-block;
+    background:rgba(255,255,255,0.15);
+    border:1px solid var(--gold-light);
+    color:var(--gold-light);
+    padding:4px 14px;
+    border-radius:20px;
+    font-size:13px;
+    margin-bottom:10px;
+  }
+  .rule-box p{margin:0;font-size:16.5px;font-weight:600;line-height:2;}
+
+  /* ===== Footer ===== */
+  .site-footer{
+    text-align:center;
+    padding:26px 20px 34px;
+    color:var(--muted);
+    font-size:13.5px;
+  }
+  .author-badge{
+    display:inline-block;
+    margin-top:10px;
+    background:var(--navy);
+    color:var(--gold-light);
+    padding:10px 26px;
+    border-radius:30px;
+    font-weight:700;
+    font-size:14px;
+    letter-spacing:.3px;
+    box-shadow:0 6px 16px rgba(15,36,64,0.25);
+  }
+  .quick-summary{
+    background:#eef3f8;
+    border-inline-start:5px solid var(--navy-2);
+    border-radius:10px;
+    padding:14px 18px;
+    margin:16px 22px 0;
+  }
+  .quick-summary .qs-title{
+    display:flex;
+    align-items:center;
+    gap:8px;
+    font-size:13px;
+    font-weight:800;
+    color:var(--navy-2);
+    margin-bottom:8px;
+    letter-spacing:.3px;
+  }
+  .quick-summary .qs-title::before{
+    content:"◆";
+    color:var(--gold);
+    font-size:11px;
+  }
+  .quick-summary ul{margin:0;padding-inline-start:20px;}
+  .quick-summary li{
+    font-size:14px;
+    color:var(--navy-2);
+    margin-bottom:6px;
+    font-weight:600;
+  }
+  .quick-summary li::marker{color:var(--gold);}
+  .quick-summary li b{color:var(--navy);}
+
+  /* ===== Executive Summary tab ===== */
+  .core-idea{
+    background:linear-gradient(120deg,var(--navy) 0%, var(--navy-2) 100%);
+    color:#fff;
+    border-radius:14px;
+    padding:22px 24px;
+    margin-bottom:20px;
+    box-shadow:0 8px 20px rgba(15,36,64,0.22);
+  }
+  .core-idea .tag{
+    display:inline-block;
+    background:rgba(255,255,255,0.15);
+    border:1px solid var(--gold-light);
+    color:var(--gold-light);
+    padding:4px 14px;
+    border-radius:20px;
+    font-size:13px;
+    margin-bottom:10px;
+  }
+  .core-idea p{margin:0;font-size:16.5px;font-weight:600;line-height:2;}
+  .core-idea b{color:var(--gold-light);}
+
+  .axis-grid{display:flex;flex-direction:column;gap:16px;}
+  .axis-card{
+    background:var(--card);
+    border:1px solid var(--line);
+    border-radius:14px;
+    box-shadow:0 4px 14px rgba(15,36,64,0.05);
+    overflow:hidden;
+  }
+  .axis-card .axis-head{
+    display:flex;
+    align-items:center;
+    gap:12px;
+    padding:14px 20px;
+    background:#f6f2e6;
+    border-bottom:1px solid var(--line);
+  }
+  .axis-card .axis-icon{
+    flex:0 0 auto;
+    width:34px;height:34px;
+    border-radius:9px;
+    background:var(--gold);
+    color:var(--navy);
+    display:flex;align-items:center;justify-content:center;
+    font-weight:800;
+    font-size:15px;
+  }
+  .axis-card .axis-head h5{margin:0;color:var(--navy-2);font-size:16.5px;font-weight:800;}
+  .axis-card .axis-body{padding:16px 20px;}
+  .axis-card .axis-body ul{margin:0;padding-inline-start:20px;}
+  .axis-card .axis-body li{font-size:14.5px;margin-bottom:8px;color:var(--ink);}
+  .axis-card .axis-body li::marker{color:var(--gold);}
+  .axis-card .axis-body b{color:var(--navy-2);}
+
+  .obstacles-mini{
+    display:grid;
+    grid-template-columns:repeat(2,1fr);
+    gap:10px;
+    margin-top:6px;
+  }
+  .obstacles-mini .om-item{
+    background:#fbf6e9;
+    border:1px solid var(--gold-light);
+    border-radius:10px;
+    padding:10px 14px;
+    font-size:13.5px;
+    color:#4a3c14;
+  }
+  .obstacles-mini .om-item b{display:block;color:var(--navy-2);font-size:13.5px;margin-bottom:3px;}
+  @media (max-width:640px){.obstacles-mini{grid-template-columns:1fr;}}
+
+  .final-rule{
+    background:linear-gradient(120deg,#3a2c0d 0%, #6b4e14 60%, var(--gold) 130%);
+    color:#fff;
+    border-radius:14px;
+    padding:24px 26px;
+    margin-top:20px;
+    text-align:center;
+    box-shadow:0 10px 24px rgba(107,78,20,0.3);
+  }
+  .final-rule .tag{
+    display:inline-block;
+    background:rgba(255,255,255,0.18);
+    border:1px solid #fff;
+    color:#fff;
+    padding:4px 16px;
+    border-radius:20px;
+    font-size:13px;
+    margin-bottom:12px;
+    font-weight:700;
+  }
+  .final-rule p{margin:0;font-size:17px;font-weight:700;line-height:2;}
+
+  /* ===== Interactive Quiz ===== */
+  .quiz-card{
+    background:var(--card);
+    border:1px solid var(--line);
+    border-radius:14px;
+    padding:24px 26px;
+    box-shadow:0 6px 18px rgba(15,36,64,0.06);
+  }
+  .quiz-options-group{margin-bottom:20px;}
+  .quiz-options-group > label.qg-label{
+    display:block;
+    font-weight:800;
+    color:var(--navy-2);
+    font-size:14.5px;
+    margin-bottom:10px;
+  }
+  .pill-row{display:flex;gap:10px;flex-wrap:wrap;}
+  .pill{
+    position:relative;
+  }
+  .pill input{position:absolute;opacity:0;inset:0;cursor:pointer;}
+  .pill span{
+    display:inline-block;
+    padding:9px 18px;
+    border-radius:24px;
+    border:1.5px solid var(--line);
+    font-size:14px;
+    font-weight:600;
+    color:var(--muted);
+    background:#fbfaf6;
+    transition:.15s;
+    cursor:pointer;
+  }
+  .pill input:checked + span{
+    background:var(--navy);
+    border-color:var(--navy);
+    color:#fff;
+  }
+  .start-btn{
+    display:inline-block;
+    margin-top:6px;
+    background:linear-gradient(120deg,var(--gold) 0%, #c9a648 100%);
+    color:var(--navy);
+    border:none;
+    padding:13px 34px;
+    font-size:15.5px;
+    font-weight:800;
+    border-radius:30px;
+    cursor:pointer;
+    box-shadow:0 6px 16px rgba(184,145,47,0.35);
+    font-family:inherit;
+    transition:.15s;
+  }
+  .start-btn:hover{transform:translateY(-1px);box-shadow:0 8px 20px rgba(184,145,47,0.45);}
+  .ghost-btn{
+    display:inline-block;
+    background:transparent;
+    border:1.5px solid var(--navy-2);
+    color:var(--navy-2);
+    padding:10px 26px;
+    font-size:14.5px;
+    font-weight:700;
+    border-radius:30px;
+    cursor:pointer;
+    font-family:inherit;
+    transition:.15s;
+  }
+  .ghost-btn:hover{background:var(--navy-2);color:#fff;}
+
+  .quiz-progress-wrap{
+    display:flex;align-items:center;gap:12px;
+    margin-bottom:18px;
+  }
+  .quiz-progress-bar{
+    flex:1;height:8px;background:#eee6d3;border-radius:6px;overflow:hidden;
+  }
+  .quiz-progress-fill{
+    height:100%;background:linear-gradient(90deg,var(--gold),var(--navy-2));
+    width:0%;transition:width .3s;
+  }
+  .quiz-progress-text{font-size:13px;font-weight:700;color:var(--muted);white-space:nowrap;}
+
+  .quiz-axis-tag{
+    display:inline-block;
+    background:#eef3f8;
+    color:var(--navy-2);
+    font-size:12.5px;
+    font-weight:700;
+    padding:4px 12px;
+    border-radius:16px;
+    margin-bottom:12px;
+  }
+  .quiz-axis-tag.high{background:#fdeee0;color:#8a4a12;}
+  .quiz-question-text{
+    font-size:17.5px;
+    font-weight:800;
+    color:var(--navy);
+    margin:0 0 18px;
+    line-height:1.9;
+  }
+  .quiz-opt-btn{
+    display:block;
+    width:100%;
+    text-align:right;
+    background:#fbfaf6;
+    border:1.5px solid var(--line);
+    border-radius:10px;
+    padding:13px 18px;
+    margin-bottom:10px;
+    font-size:14.5px;
+    font-weight:600;
+    color:var(--ink);
+    cursor:pointer;
+    font-family:inherit;
+    transition:.15s;
+  }
+  .quiz-opt-btn:hover:not(:disabled){border-color:var(--gold);background:#fbf6e9;}
+  .quiz-opt-btn:disabled{cursor:default;}
+  .quiz-opt-btn.correct{background:#e7f6ea;border-color:#3aa35a;color:#1e5e33;font-weight:800;}
+  .quiz-opt-btn.incorrect{background:#fbe9e9;border-color:#c94c4c;color:#7d2323;font-weight:800;}
+  .tf-row{display:flex;gap:14px;}
+  .tf-row .quiz-opt-btn{text-align:center;font-size:16px;padding:16px;}
+
+  .quiz-feedback{
+    margin-top:10px;
+    border-radius:12px;
+    padding:16px 18px;
+    font-size:14.5px;
+    line-height:1.9;
+    display:none;
+  }
+  .quiz-feedback.show{display:block;}
+  .quiz-feedback.correct-fb{background:#e7f6ea;border:1px solid #3aa35a;color:#1e5e33;}
+  .quiz-feedback.incorrect-fb{background:#fbe9e9;border:1px solid #c94c4c;color:#7d2323;}
+  .quiz-feedback .fb-title{font-weight:800;margin-bottom:6px;font-size:15px;}
+  .quiz-feedback .fb-ref{
+    display:block;margin-top:8px;font-size:13px;font-weight:700;
+    color:var(--navy-2);
+  }
+  .quiz-nav{margin-top:18px;text-align:left;}
+
+  .result-score-circle{
+    width:150px;height:150px;
+    border-radius:50%;
+    margin:0 auto 18px;
+    display:flex;align-items:center;justify-content:center;flex-direction:column;
+    background:conic-gradient(var(--gold) calc(var(--pct)*1%), #eee6d3 0);
+    position:relative;
+  }
+  .result-score-circle::before{
+    content:"";
+    position:absolute;inset:10px;
+    background:var(--card);
+    border-radius:50%;
+  }
+  .result-score-circle .rs-num{position:relative;font-size:30px;font-weight:900;color:var(--navy);}
+  .result-score-circle .rs-lbl{position:relative;font-size:12.5px;color:var(--muted);font-weight:700;}
+  .result-msg{text-align:center;font-size:16px;font-weight:800;color:var(--navy-2);margin-bottom:20px;}
+  .breakdown-table{width:100%;border-collapse:collapse;margin-top:8px;font-size:14px;}
+  .breakdown-table th,.breakdown-table td{
+    padding:10px 12px;border-bottom:1px solid var(--line);text-align:right;
+  }
+  .breakdown-table th{background:#f6f2e6;color:var(--navy-2);font-weight:800;}
+  .breakdown-table td.num{text-align:center;font-weight:700;}
+
+  .quiz-scenario-box{
+    background:#eef3f8;
+    border-inline-start:5px solid var(--navy-2);
+    border-radius:10px;
+    padding:14px 18px;
+    margin-bottom:14px;
+    font-size:14.5px;
+    color:var(--navy-2);
+    font-weight:600;
+    line-height:1.9;
+  }
+  .quiz-essay-textarea{
+    width:100%;
+    min-height:120px;
+    border:1.5px solid var(--line);
+    border-radius:10px;
+    padding:14px;
+    font-family:inherit;
+    font-size:14.5px;
+    color:var(--ink);
+    resize:vertical;
+    background:#fbfaf6;
+  }
+  .quiz-essay-textarea:focus{outline:none;border-color:var(--gold);}
+  .compare-grid{
+    display:grid;
+    grid-template-columns:1fr 1fr;
+    gap:14px;
+    margin-top:16px;
+  }
+  @media (max-width:720px){.compare-grid{grid-template-columns:1fr;}}
+  .compare-box{
+    border-radius:12px;
+    padding:14px 16px;
+    font-size:14px;
+    line-height:1.85;
+  }
+  .compare-box.mine{background:#f3f1ea;border:1px solid var(--line);color:var(--ink);}
+  .compare-box.model{background:#eef7ee;border:1px solid #79b98c;color:#1e5e33;}
+  .compare-box h6{margin:0 0 8px;font-size:13.5px;font-weight:800;color:var(--navy-2);}
+  .compare-box.model h6{color:#1e5e33;}
+  .key-points-box{
+    margin-top:12px;
+    background:#fbf6e9;
+    border:1px dashed var(--gold);
+    border-radius:10px;
+    padding:12px 16px;
+  }
+  .key-points-box h6{margin:0 0 8px;font-size:13.5px;font-weight:800;color:#8a4a12;}
+  .key-points-box ul{margin:0;padding-inline-start:18px;}
+  .key-points-box li{font-size:13.5px;margin-bottom:5px;color:#4a3c14;}
+  .self-rate-wrap{margin-top:18px;text-align:center;}
+  .self-rate-wrap p{font-size:14px;font-weight:700;color:var(--navy-2);margin:0 0 10px;}
+  .rate-btn{
+    border:1.5px solid var(--line);
+    background:#fbfaf6;
+    padding:10px 18px;
+    border-radius:24px;
+    font-size:13.5px;
+    font-weight:700;
+    cursor:pointer;
+    margin:4px;
+    font-family:inherit;
+    transition:.15s;
+  }
+  .rate-btn:hover{transform:translateY(-1px);}
+  .rate-btn.r0{color:#7d2323;} .rate-btn.r0:hover{background:#fbe9e9;border-color:#c94c4c;}
+  .rate-btn.r50{color:#8a4a12;} .rate-btn.r50:hover{background:#fdeee0;border-color:#c9862c;}
+  .rate-btn.r75{color:#1e5e33;} .rate-btn.r75:hover{background:#eaf5ec;border-color:#5fae78;}
+  .rate-btn.r100{color:#1e5e33;} .rate-btn.r100:hover{background:#e7f6ea;border-color:#3aa35a;}
+  .rate-btn.selected{color:#fff;background:var(--navy);border-color:var(--navy);}
+
+  .hidden{display:none !important;}
+
+  .no-file-note{
+    background:#fff7e6;
+    border:1px solid var(--gold);
+    color:#5c4813;
+    padding:12px 16px;
+    border-radius:10px;
+    font-size:13.5px;
+    margin-bottom:18px;
+  }
+
+  @media (max-width:640px){
+    .site-header h1{font-size:24px;}
+  }
+</style>
+</head>
+<body>
+<div id="dlp-return-bar" style="position:sticky;top:0;z-index:9999;background:#0C2A36;color:#F2EFE6;padding:10px 16px;display:flex;flex-wrap:wrap;gap:10px;align-items:center;justify-content:space-between;font-family:'Tajawal',-apple-system,'Segoe UI',Tahoma,sans-serif;border-bottom:3px solid #B8891B">
+<span style="font-size:.86rem;color:#C9D4D6">ملخص المحاضرة الأولى — حوكمة الأمن السيبراني</span>
+<span style="display:flex;gap:8px">
+<a href="../../index.html#/subject/cybersecurity-governance/summaries" style="background:#B8891B;color:#22180A;text-decoration:none;padding:7px 14px;border-radius:8px;font-weight:800;font-size:.84rem">→ العودة إلى المادة</a>
+<a href="../../index.html#/" style="background:rgba(255,255,255,.1);color:#fff;text-decoration:none;padding:7px 14px;border-radius:8px;font-weight:800;font-size:.84rem;border:1px solid rgba(255,255,255,.25)">⌂ الرئيسية</a>
+</span>
+</div>
+
+<header class="site-header">
+  <div class="header-inner">
+    <span class="eyebrow">ملخص أكاديمي احترافي — حوكمة الأمن السيبراني</span>
+    <h1>مقدمة في الأمن السيبراني وحوكمة أمن المعلومات</h1>
+    <h2>المحاضرة الأولى: مفاهيم الأمن السيبراني الأساسية وحوكمة أمن المعلومات</h2>
+    <div class="meta-row">
+      <span>المُحاضِر: <b>أ.د. ضياء جاسم كاظم</b></span><span>مدة المحاضرة: <b>ساعة ونصف</b></span><span>نوع الملخص: <b>ملخص نقطي تفصيلي ملتزم بالنص الأصلي</b></span>
+    </div>
+  </div>
+</header>
+
+<div class="wrap">
+
+  <div class="no-file-note">
+    ملاحظة: هذا الملخص التفاعلي مبني حصريًا على محتوى محاضرة الأسبوع الأول. تم تصميم الصفحة بنظام تبويبات بحيث يمكن إضافة تبويب مستقل لكل محاضرة إضافية لاحقًا دون تعديل الهيكل العام.
+  </div>
+
+  <div class="tabs-bar">
+    <button class="tab-btn active" onclick="showTab('summary')">
+      الملخص التنفيذي الشامل
+      <span class="sub">نظرة أكاديمية مركّزة على المحاضرة كاملة</span>
+    </button>
+    <button class="tab-btn" onclick="showTab('lec1')">
+      المحاضرة الأولى (تفصيلي)
+      <span class="sub">مقدمة في الأمن السيبراني وحوكمة أمن المعلومات</span>
+    </button>
+    <button class="tab-btn" onclick="showTab('quiz')">
+      التمرين التفاعلي
+      <span class="sub">اختبار ذاتي مخصص بتغذية راجعة فورية</span>
+    </button>
+  </div>
+
+  <!-- ===================== TAB: EXECUTIVE SUMMARY ===================== -->
+  <div id="summary" class="tab-panel active">
+
+    <div class="doc-card">
+      <h3>الملخص التنفيذي الشامل</h3>
+      <p>عرض أكاديمي مُركّز لمحوري المحاضرة (الأمن السيبراني، وحوكمة أمن المعلومات)، منظّم حول ستة أبعاد جوهرية تسهّل الفهم والاستيعاب السريع للمحتوى، مع القاعدة الجامعة في الختام.</p>
+    </div>
+
+    <div class="core-idea">
+      <span class="tag">الفكرة المحورية للمحاضرة</span>
+      <p>الأمن السيبراني يحمي <b>السرية والسلامة والتوافر</b> لأصول المعلومات، لكن الحماية التقنية وحدها لا تكفي؛ إذ تحتاج إلى <b>حوكمة</b> توجّه القرارات الأمنية وتُحمّل المسؤولية.</p>
+    </div>
+
+    <div class="axis-grid">
+      <div class="axis-card">
+        <div class="axis-head">
+          <div class="axis-icon">١</div>
+          <h5>ما هو الأمن السيبراني؟</h5>
+        </div>
+        <div class="axis-body">
+          <ul>
+            <li><b>التعريف:</b> مجموعة الممارسات والتقنيات والسياسات التي تحمي الأنظمة والشبكات والبيانات من الوصول غير المصرح به أو الهجمات أو الأضرار.</li>
+            <li>يشمل النطاق حماية الأجهزة والبرمجيات والشبكات والبيانات، وحتى <b>سلوك المستخدمين أنفسهم</b>.</li>
+            <li>الهدف النهائي: ضمان استمرارية الأعمال، وحماية الخصوصية، والحفاظ على ثقة أصحاب المصلحة.</li>
+          </ul>
+        </div>
+      </div>
+      <div class="axis-card">
+        <div class="axis-head">
+          <div class="axis-icon">٢</div>
+          <h5>مثلث CIA والمبادئ التكميلية</h5>
+        </div>
+        <div class="axis-body">
+          <ul>
+            <li><b>السرية (Confidentiality):</b> عدم اطلاع غير المصرح لهم على المعلومات الحساسة.</li>
+            <li><b>السلامة (Integrity):</b> دقة البيانات واكتمالها وعدم التلاعب بها دون تصريح.</li>
+            <li><b>التوافر (Availability):</b> وصول المستخدمين المخوّلين للمعلومات والأنظمة عند الحاجة.</li>
+            <li>مبادئ تكميلية: المصادقة، التفويض، عدم الإنكار، و<b>المساءلة</b> — وهي المهمة التي تربط الأمن بالحوكمة.</li>
+          </ul>
+        </div>
+      </div>
+      <div class="axis-card">
+        <div class="axis-head">
+          <div class="axis-icon">٣</div>
+          <h5>التهديدات والفاعلون ونواقل الهجوم</h5>
+        </div>
+        <div class="axis-body">
+          <ul>
+            <li>أبرز التهديدات: البرمجيات الخبيثة، برمجيات الفدية، التصيد الاحتيالي، حجب الخدمة، الهندسة الاجتماعية، والتهديدات الداخلية.</li>
+            <li>الفاعلون: قراصنة أفراد، جماعات إجرامية منظمة، جهات مدعومة من دول، وناشطون سيبرانيون.</li>
+            <li>نواقل الهجوم الشائعة: البريد الإلكتروني، الثغرات غير المحدَّثة، كلمات المرور الضعيفة، والشبكات غير الآمنة.</li>
+          </ul>
+        </div>
+      </div>
+      <div class="axis-card">
+        <div class="axis-head">
+          <div class="axis-icon">٤</div>
+          <h5>ما هي حوكمة أمن المعلومات؟</h5>
+        </div>
+        <div class="axis-body">
+          <ul>
+            <li>الحوكمة تجيب عن سؤال: <b>«من يقرر؟ وكيف تتم المساءلة؟»</b>، والإدارة تنفّذ وتشغّل يوميًا.</li>
+            <li>حوكمة أمن المعلومات: الإطار الذي يحدد من خلاله مجلس الإدارة والإدارة التنفيذية التوجهات والمسؤوليات المتعلقة بأمن المعلومات.</li>
+            <li>تربط استراتيجية الأمن السيبراني بأهداف العمل العامة للمؤسسة (الربط الاستراتيجي).</li>
+          </ul>
+        </div>
+      </div>
+      <div class="axis-card">
+        <div class="axis-head">
+          <div class="axis-icon">٥</div>
+          <h5>أركان الحوكمة وأصحاب المصلحة</h5>
+        </div>
+        <div class="axis-body">
+          <ul>
+            <li>الأركان الستة: القيادة والالتزام، الهيكل التنظيمي، السياسات والمعايير، إدارة المخاطر، الامتثال، وقياس الأداء.</li>
+            <li>أصحاب المصلحة: مجلس الإدارة، الإدارة التنفيذية، مسؤول أمن المعلومات (CISO)، والموظفون والمستخدمون.</li>
+          </ul>
+        </div>
+      </div>
+      <div class="axis-card">
+        <div class="axis-head">
+          <div class="axis-icon">٦</div>
+          <h5>المخاطر والأطر المرجعية</h5>
+        </div>
+        <div class="axis-body">
+          <ul>
+            <li>الخطر (Risk) = احتمال وقوع حدث يؤثر سلبًا على أصول المؤسسة، ناتج عن التقاء تهديد (Threat) بثغرة (Vulnerability).</li>
+            <li>أطر الحوكمة المرجعية: NIST CSF 2.0، ISO/IEC 27001، ISO/IEC 27014، وCOBIT 2019.</li>
+          </ul>
+        </div>
+      </div>
+
+    </div>
+
+    <div class="final-rule">
+      <span class="tag">الخلاصة النهائية — القاعدة الذهبية</span>
+      <p>الحوكمة توجّه وتراقب، والعمليات الأمنية تنفّذ وتشغّل.<br>الأركان الستة للحوكمة هي الأساس الذي يُبنى عليه أي برنامج أمني ناضج.</p>
+    </div>
+
+  </div>
+  <!-- ===================== END EXECUTIVE SUMMARY ===================== -->
+
+  <!-- ===================== TAB: LECTURE DETAIL ===================== -->
+  <div id="lec1" class="tab-panel">
+
+    <div class="doc-card">
+      <h3>نبذة عن المحاضرة</h3>
+      <p>محاضرة مدتها ساعة ونصف موزعة على محورين رئيسيين: مدخل شامل إلى مفاهيم الأمن السيبراني الأساسية (التهديدات، الفاعلون، مثلث CIA)، ثم مدخل إلى حوكمة أمن المعلومات وأركانها وأصحاب المصلحة فيها ودورها في حماية المؤسسات.</p>
+    </div>
+
+    <div class="section-card">
+      <div class="section-head">
+        <div class="section-num">1</div>
+        <h4>عن هذه المحاضرة</h4>
+      </div>
+      <div class="section-body">
+        <p>محاضرة مدتها ساعة ونصف موزعة على محورين رئيسيين مع فاصل نقاش: مدخل شامل إلى مفاهيم الأمن السيبراني الأساسية، ثم مدخل إلى حوكمة أمن المعلومات ودورها في حماية المؤسسات.</p>
+      </div>
+    </div>
+    <div class="section-card">
+      <div class="section-head">
+        <div class="section-num">2</div>
+        <h4>مدخل إلى الأمن السيبراني: التعريف والأهمية</h4>
+      </div>
+      <div class="section-body">
+        <p>الأمن السيبراني مجموعة الممارسات والتقنيات والسياسات التي تحمي الأنظمة والشبكات والبيانات من الوصول غير المصرح به أو الهجمات أو الأضرار. يشمل النطاق حماية الأجهزة والبرمجيات والشبكات والبيانات، وحتى سلوك المستخدمين أنفسهم.</p><p>المؤسسات تتعرض لمحاولات اختراق واستطلاع مستمرة على مدار الساعة، مع ارتفاع مستمر في تكلفة الحوادث السيبرانية، وتحوّل البيانات إلى أصل استراتيجي يستوجب حماية مماثلة للأصول المالية.</p>
+      </div>
+    </div>
+    <div class="section-card">
+      <div class="section-head">
+        <div class="section-num">3</div>
+        <h4>مثلث CIA والمبادئ التكميلية</h4>
+      </div>
+      <div class="section-body">
+        <p><b>السرية (Confidentiality):</b> ضمان عدم اطلاع غير المصرح لهم على المعلومات الحساسة.</p><p><b>السلامة (Integrity):</b> ضمان دقة البيانات واكتمالها وعدم التلاعب بها دون تصريح.</p><p><b>التوافر (Availability):</b> ضمان وصول المستخدمين المخوّلين للمعلومات والأنظمة عند الحاجة.</p><p>مبادئ تكميلية: المصادقة (Authentication)، التفويض (Authorization)، عدم الإنكار (Non-repudiation)، والمساءلة (Accountability) — وهي المهمة التي تربط الأمن السيبراني بالحوكمة.</p>
+      </div>
+    </div>
+    <div class="section-card">
+      <div class="section-head">
+        <div class="section-num">4</div>
+        <h4>التهديدات السيبرانية والفاعلون ونواقل الهجوم</h4>
+      </div>
+      <div class="section-body">
+        <p>أبرز أنواع التهديدات: البرمجيات الخبيثة، برمجيات الفدية، التصيد الاحتيالي، هجمات حجب الخدمة، الهندسة الاجتماعية، والتهديدات الداخلية.</p><p>من يقف خلف الهجمات؟ قراصنة أفراد، جماعات إجرامية منظمة، جهات مدعومة من دول، والناشطون السيبرانيون.</p><p>أبرز المنافذ التي يستغلها المهاجمون: البريد الإلكتروني والمرفقات الخبيثة، الثغرات غير المحدَّثة، كلمات المرور الضعيفة، والشبكات غير الآمنة.</p><div class='example-box'>لماذا تحدث الاختراقات غالبًا؟ ضعف الوعي البشري، غياب التحديثات، وضعف الحوكمة.</div>
+      </div>
+    </div>
+    <div class="section-card">
+      <div class="section-head">
+        <div class="section-num">5</div>
+        <h4>ما هي حوكمة أمن المعلومات؟</h4>
+      </div>
+      <div class="section-body">
+        <p>الحوكمة مجموعة الأنظمة والعمليات التي توجّه وتراقب أداء المؤسسة لتحقيق أهدافها. الفكرة الجوهرية: الحوكمة تجيب عن سؤال «من يقرر؟ وكيف تتم المساءلة؟».</p><p>حوكمة أمن المعلومات: الإطار الذي يحدد من خلاله مجلس الإدارة والإدارة التنفيذية التوجهات والأهداف والمسؤوليات المتعلقة بأمن المعلومات، مع مواءمة استراتيجية الأمن السيبراني مع أهداف العمل العامة للمؤسسة.</p>
+      </div>
+    </div>
+    <div class="section-card">
+      <div class="section-head">
+        <div class="section-num">6</div>
+        <h4>الحوكمة مقابل الإدارة</h4>
+      </div>
+      <div class="section-body">
+        <div class='hp-cmp-wrap'><table class='hp-cmp'><thead><tr><th>الحوكمة (Governance)</th><th>الإدارة (Management)</th></tr></thead><tbody><tr><td>وضع التوجهات والأهداف الاستراتيجية</td><td>التنفيذ اليومي للأنشطة والمهام</td></tr><tr><td>اعتماد السياسات والإشراف عليها</td><td>تطبيق السياسات والإجراءات المعتمدة</td></tr><tr><td>تحديد المسؤوليات والمساءلة</td><td>الاستجابة التشغيلية للحوادث</td></tr><tr><td>متابعة الأداء العام على مستوى المجلس</td><td>تقارير الأداء التشغيلي</td></tr></tbody></table></div>
+      </div>
+    </div>
+    <div class="section-card">
+      <div class="section-head">
+        <div class="section-num">7</div>
+        <h4>أركان الحوكمة وأصحاب المصلحة</h4>
+      </div>
+      <div class="section-body">
+        <p>الأركان الأساسية لحوكمة أمن المعلومات: القيادة والالتزام، الهيكل التنظيمي، السياسات والمعايير، إدارة المخاطر، الامتثال، وقياس الأداء.</p><p>من يشارك في حوكمة أمن المعلومات؟ مجلس الإدارة (يضع التوجهات العليا)، الإدارة التنفيذية (تترجمها لخطط)، مسؤول أمن المعلومات CISO (يقود البرنامج الأمني)، والموظفون والمستخدمون (خط الدفاع الأول).</p>
+      </div>
+    </div>
+    <div class="section-card">
+      <div class="section-head">
+        <div class="section-num">8</div>
+        <h4>مفهوم المخاطر السيبرانية والأطر المرجعية</h4>
+      </div>
+      <div class="section-body">
+        <p>الخطر (Risk): احتمال وقوع حدث يؤثر سلبًا على أصول المؤسسة أو أهدافها. التهديد (Threat): أي مصدر محتمل يمكن أن يستغل ثغرة لإحداث ضرر. الثغرة (Vulnerability): نقطة ضعف في النظام يمكن استغلالها من قبل التهديد.</p><p>أطر الحوكمة المرجعية: NIST CSF 2.0 (يضم وظيفة مخصصة للحوكمة Govern)، ISO/IEC 27014، ISO/IEC 27001، وCOBIT 2019.</p>
+      </div>
+    </div>
+
+  </div>
+  <!-- ===================== END LECTURE DETAIL ===================== -->
+
+  <!-- ===================== TAB: INTERACTIVE QUIZ ===================== -->
+  <div id="quiz" class="tab-panel">
+
+    <div class="doc-card">
+      <h3>التمرين التفاعلي — اختبار ذاتي موثّق بالمرجع</h3>
+      <p>بنك أسئلة (١٨ سؤالًا) مبني حصريًا على محتوى المحاضرة، يغطي مفاهيم الأمن السيبراني الأساسية وأركان الحوكمة السيبرانية، ويشمل: اختيار من متعدد، صح وخطأ، مقالي وسيناريو تطبيقي. اختر نمط الاختبار المناسب، وستحصل على تغذية راجعة فورية مع الإشارة إلى المحور المرجعي لكل إجابة.</p>
+    </div>
+
+    <!-- ===== Setup Screen ===== -->
+    <div id="quiz-setup" class="quiz-card">
+
+      <div class="quiz-options-group">
+        <label class="qg-label">١. عدد الأسئلة</label>
+        <div class="pill-row" id="qcount-group">
+          <label class="pill"><input type="radio" name="qcount" value="5"><span>سريع (٥ أسئلة)</span></label>
+          <label class="pill"><input type="radio" name="qcount" value="10" checked><span>متوسط (١٠ أسئلة)</span></label>
+          <label class="pill"><input type="radio" name="qcount" value="all"><span>شامل (كل البنك — ١٨)</span></label>
+        </div>
+      </div>
+
+      <div class="quiz-options-group">
+        <label class="qg-label">٢. نوع الأسئلة</label>
+        <div class="pill-row" id="qtype-group">
+          <label class="pill"><input type="radio" name="qtype" value="mixed_all" checked><span>منوّع شامل (كل الأنواع)</span></label>
+          <label class="pill"><input type="radio" name="qtype" value="objective"><span>موضوعي فقط (MCQ + صح/خطأ)</span></label>
+          <label class="pill"><input type="radio" name="qtype" value="mcq"><span>اختيار من متعدد فقط</span></label>
+          <label class="pill"><input type="radio" name="qtype" value="tf"><span>صح وخطأ فقط</span></label>
+          <label class="pill"><input type="radio" name="qtype" value="essay"><span>أسئلة مقالية فقط</span></label>
+          <label class="pill"><input type="radio" name="qtype" value="scenario"><span>سيناريوهات تطبيقية فقط</span></label>
+        </div>
+        <p style="font-size:13px;color:var(--muted);margin:8px 2px 0;">
+          ملاحظة: الأسئلة المقالية والسيناريوهات لا تُصحَّح آليًا؛ بل تُعرض بعد إجابتك <b>الإجابة النموذجية وعناصر التقييم الرئيسية</b> لتقارن إجابتك بها وتُقيّم نفسك ذاتيًا.
+        </p>
+      </div>
+
+      <div class="quiz-options-group">
+        <label class="qg-label">٣. نطاق التركيز</label>
+        <div class="pill-row" id="qfocus-group">
+          <label class="pill"><input type="radio" name="qfocus" value="all" checked><span>جميع المحاور</span></label>
+          <label class="pill"><input type="radio" name="qfocus" value="high"><span>التركيز على المواضيع ذات الأهمية العالية</span></label>
+        </div>
+      </div>
+
+      <button class="start-btn" onclick="startQuiz()">ابدأ الاختبار ▶</button>
+    </div>
+
+    <!-- ===== Question Screen ===== -->
+    <div id="quiz-question" class="quiz-card hidden">
+      <div class="quiz-progress-wrap">
+        <span class="quiz-progress-text" id="q-progress-text">السؤال ١ من ١٠</span>
+        <div class="quiz-progress-bar"><div class="quiz-progress-fill" id="q-progress-fill"></div></div>
+        <span class="quiz-progress-text" id="q-score-text">النتيجة: ٠</span>
+      </div>
+
+      <span class="quiz-axis-tag" id="q-axis-tag">المحور</span>
+      <p class="quiz-question-text" id="q-question-text">نص السؤال</p>
+
+      <div id="q-options-wrap"></div>
+
+      <div class="quiz-feedback" id="q-feedback">
+        <div class="fb-title" id="q-feedback-title"></div>
+        <div id="q-feedback-body"></div>
+        <span class="fb-ref" id="q-feedback-ref"></span>
+      </div>
+
+      <div class="quiz-nav">
+        <button class="start-btn hidden" id="q-next-btn" onclick="nextQuestion()">السؤال التالي ◀</button>
+      </div>
+    </div>
+
+    <!-- ===== Result Screen ===== -->
+    <div id="quiz-result" class="quiz-card hidden">
+      <div class="result-score-circle" id="result-circle" style="--pct:0;">
+        <div class="rs-num" id="result-num">0/0</div>
+        <div class="rs-lbl">إجابات صحيحة</div>
+      </div>
+      <p class="result-msg" id="result-msg"></p>
+
+      <table class="breakdown-table">
+        <thead>
+          <tr><th>المحور</th><th class="num">صحيح</th><th class="num">إجمالي</th></tr>
+        </thead>
+        <tbody id="result-breakdown-body"></tbody>
+      </table>
+
+      <div style="text-align:center;margin-top:22px;">
+        <button class="ghost-btn" onclick="restartQuiz()">إعادة الضبط والبدء من جديد ↻</button>
+      </div>
+    </div>
+
+  </div>
+  <!-- ===================== END INTERACTIVE QUIZ ===================== -->
+
+</div>
+
+
+<footer class="site-footer">
+  <div>تم إعداد هذا الملخص بالاعتماد الحصري على محتوى محاضرة الأسبوع الأول — مقدمة في الأمن السيبراني وحوكمة أمن المعلومات.</div>
+  <div class="author-badge">اعداد المهندس/ حسين ياسين حسن - 2026</div>
+</footer>
+
+<script>
+  function showTab(id){
+    document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+    document.getElementById(id).classList.add('active');
+    event.currentTarget.classList.add('active');
+  }
+</script>
+<script>
+  // ============ QUIZ DATA (built strictly from the lecture content) ============
+  const QUESTION_BANK = [
+{axis:1, axisTitle:"ما هو الأمن السيبراني؟", importance:"high", type:"mcq",
+     q:"ما تعريف الأمن السيبراني بحسب المحاضرة؟",
+     options:["برنامج واحد يحمي الجهاز من الفيروسات فقط","مجموعة الممارسات والتقنيات والسياسات التي تحمي الأنظمة والشبكات والبيانات من الوصول غير المصرح به أو الهجمات أو الأضرار","إجراء إداري يقتصر على قسم تقنية المعلومات","خدمة تقدمها شركات التأمين حصرًا"],
+     correct:1,
+     fb:"الأمن السيبراني نطاقه أوسع من أداة واحدة، ويشمل حماية الأجهزة والبرمجيات والشبكات والبيانات وحتى سلوك المستخدمين."},
+    {axis:1, axisTitle:"ما هو الأمن السيبراني؟", importance:"normal", type:"tf",
+     q:"يشمل نطاق الأمن السيبراني سلوك المستخدمين أنفسهم وليس الأجهزة والبرمجيات فقط.",
+     correct:true,
+     fb:"صحيح — النطاق يشمل حماية الأجهزة والبرمجيات والشبكات والبيانات، وحتى سلوك المستخدمين أنفسهم."},
+
+    {axis:2, axisTitle:"مثلث CIA والمبادئ التكميلية", importance:"high", type:"mcq",
+     q:"ما الذي يعنيه ضلع «السلامة (Integrity)» في مثلث CIA؟",
+     options:["إتاحة الخدمة على مدار الساعة","دقة البيانات واكتمالها وعدم تعديلها دون تصريح","تشفير البيانات أثناء النقل فقط","حصر الوصول بالإدارة العليا"],
+     correct:1,
+     fb:"السلامة (Integrity) تعني ضمان دقة البيانات واكتمالها وعدم التلاعب بها دون تصريح."},
+    {axis:2, axisTitle:"مثلث CIA والمبادئ التكميلية", importance:"high", type:"mcq",
+     q:"أي مبدأ من المبادئ التكميلية هو «المهمة التي تربط الأمن السيبراني بالحوكمة» بحسب المحاضرة؟",
+     options:["المصادقة (Authentication)","التفويض (Authorization)","المساءلة (Accountability)","عدم الإنكار (Non-repudiation)"],
+     correct:2,
+     fb:"المساءلة (Accountability) هي ربط كل نشاط بجهة أو شخص مسؤول عنه، وهي المهمة التي تربط الأمن السيبراني بالحوكمة مباشرة."},
+    {axis:2, axisTitle:"مثلث CIA والمبادئ التكميلية", importance:"normal", type:"tf",
+     q:"التفويض (Authorization) هو التحقق من هوية المستخدم قبل منح الوصول.",
+     correct:false,
+     fb:"غير صحيح — هذا تعريف المصادقة (Authentication). التفويض يعني تحديد الصلاحيات المسموح بها بعد التحقق من الهوية."},
+
+    {axis:3, axisTitle:"التهديدات والفاعلون ونواقل الهجوم", importance:"high", type:"mcq",
+     q:"أي مما يلي يمثّل «الهندسة الاجتماعية» كنوع من التهديدات؟",
+     options:["إغراق الأنظمة بالطلبات لتعطيلها","استغلال الثقة والسلوك البشري بدلًا من الثغرات التقنية","تشفير بيانات الضحية والمطالبة بفدية","تسجيل وقت الدخول ونوع الإجراء"],
+     correct:1,
+     fb:"الهندسة الاجتماعية تستغل الثقة والسلوك البشري بدلاً من استغلال الثغرات التقنية مباشرة."},
+    {axis:3, axisTitle:"التهديدات والفاعلون ونواقل الهجوم", importance:"normal", type:"mcq",
+     q:"الجهات المدعومة من دول تنفّذ هجمات موجهة بشكل أساسي لأغراض:",
+     options:["ترفيهية بحتة","استخباراتية أو سياسية أو عسكرية","تعليمية فقط","خيرية"],
+     correct:1,
+     fb:"الجهات المدعومة من دول تنفّذ هجمات موجهة لأغراض استخباراتية أو سياسية أو عسكرية."},
+    {axis:3, axisTitle:"التهديدات والفاعلون ونواقل الهجوم", importance:"normal", type:"tf",
+     q:"ضعف الوعي البشري وغياب التحديثات الأمنية من أبرز أسباب وقوع الاختراقات بحسب المحاضرة.",
+     correct:true,
+     fb:"صحيح — أضف إليهما ضعف الحوكمة (غياب سياسات واضحة وأدوار محددة)."},
+
+    {axis:4, axisTitle:"ما هي حوكمة أمن المعلومات؟", importance:"high", type:"mcq",
+     q:"السؤال الجوهري الذي تجيب عنه الحوكمة بحسب المحاضرة هو:",
+     options:["كم تكلفة النظام؟","من يقرر؟ وكيف تتم المساءلة؟","ما نوع البرمجية المستخدمة؟","متى تنتهي المحاضرة؟"],
+     correct:1,
+     fb:"الفكرة الجوهرية للحوكمة: تجيب عن سؤال «من يقرر؟ وكيف تتم المساءلة؟»."},
+    {axis:4, axisTitle:"ما هي حوكمة أمن المعلومات؟", importance:"high", type:"mcq",
+     q:"حوكمة أمن المعلومات هي الإطار الذي يحدد من خلاله:",
+     options:["الموظفون التوجهات العليا للمؤسسة","مجلس الإدارة والإدارة التنفيذية التوجهات والأهداف والمسؤوليات المتعلقة بأمن المعلومات","العملاء سياسات الشركة الداخلية","المخترقون آلية الحماية"],
+     correct:1,
+     fb:"حوكمة أمن المعلومات هي الإطار الذي يحدد من خلاله مجلس الإدارة والإدارة التنفيذية التوجهات والأهداف والمسؤوليات المتعلقة بأمن المعلومات."},
+
+    {axis:5, axisTitle:"أركان الحوكمة وأصحاب المصلحة", importance:"high", type:"mcq",
+     q:"أي مما يلي ليس من الأركان الستة لحوكمة أمن المعلومات؟",
+     options:["القيادة والالتزام","إدارة المخاطر","قياس الأداء","تسعير المنتجات"],
+     correct:3,
+     fb:"الأركان الستة: القيادة والالتزام، الهيكل التنظيمي، السياسات والمعايير، إدارة المخاطر، الامتثال، وقياس الأداء — لا علاقة لها بتسعير المنتجات."},
+    {axis:5, axisTitle:"أركان الحوكمة وأصحاب المصلحة", importance:"normal", type:"mcq",
+     q:"من يقود البرنامج الأمني ويرفع التقارير للإدارة العليا بحسب المحاضرة؟",
+     options:["مجلس الإدارة","مسؤول أمن المعلومات (CISO)","العملاء","الموردون الخارجيون"],
+     correct:1,
+     fb:"مسؤول أمن المعلومات (CISO) يقود البرنامج الأمني ويرفع التقارير للإدارة العليا."},
+    {axis:5, axisTitle:"أركان الحوكمة وأصحاب المصلحة", importance:"normal", type:"tf",
+     q:"يُعد الموظفون والمستخدمون خط الدفاع الأول في الممارسة اليومية لحوكمة أمن المعلومات.",
+     correct:true,
+     fb:"صحيح — الموظفون يلتزمون بالسياسات ويشكلون خط الدفاع الأول في الممارسة اليومية."},
+
+    {axis:6, axisTitle:"المخاطر والأطر المرجعية", importance:"high", type:"mcq",
+     q:"نقطة الضعف في النظام التي يمكن استغلالها من قبل التهديد تسمّى:",
+     options:["الخطر (Risk)","التهديد (Threat)","الثغرة (Vulnerability)","الحوكمة (Governance)"],
+     correct:2,
+     fb:"الثغرة (Vulnerability) هي نقطة ضعف في النظام يمكن استغلالها من قبل التهديد لإحداث الخطر."},
+    {axis:6, axisTitle:"المخاطر والأطر المرجعية", importance:"normal", type:"mcq",
+     q:"أي إطار مرجعي يضم وظيفة مخصصة للحوكمة تسمّى Govern؟",
+     options:["ISO/IEC 27001","COBIT 2019","NIST CSF 2.0","ISO/IEC 27014"],
+     correct:2,
+     fb:"NIST CSF 2.0 إطار أمريكي شامل يضم وظيفة مخصصة للحوكمة (Govern)."},
+    {axis:6, axisTitle:"المخاطر والأطر المرجعية", importance:"normal", type:"tf",
+     q:"الامتثال (Compliance) في حوكمة أمن المعلومات مجرد التزام قانوني منفصل عن الحوكمة.",
+     correct:false,
+     fb:"غير صحيح — الامتثال يشكل جزءًا أساسيًا من حوكمة أمن المعلومات وليس مجرد التزام قانوني منفصل عنها."},
+
+    {axis:4, axisTitle:"ما هي حوكمة أمن المعلومات؟", importance:"high", type:"scenario",
+     q:"سيناريو: مؤسسة تعرّضت لاختراق أدى إلى تسريب بيانات عملاء، وتبيّن أن السبب تأخّر تطبيق تحديث أمني معروف منذ أشهر رغم توفره. بأي ركن من أركان الحوكمة الستة يرتبط هذا التقصير، وكيف تُعالَج المشكلة على مستوى الحوكمة لا الإدارة فقط؟",
+     modelAnswer:"التقصير يرتبط بشكل أساسي بركني «إدارة المخاطر» و«قياس الأداء» (وربما «السياسات والمعايير» إن لم تكن هناك سياسة تحديثات واضحة). على مستوى الحوكمة، يجب أن يضع المجلس/الإدارة العليا سياسة إلزامية لتحديث الأنظمة ومؤشر أداء دوري يقاس به زمن تطبيق التحديثات الحرجة، لا الاكتفاء بمعالجة الثغرة تقنيًا بعد وقوع الحادث.",
+     keyPoints:["ارتباط التقصير بركني إدارة المخاطر وقياس الأداء","سياسة إلزامية لتحديث الأنظمة على مستوى الحوكمة","مؤشر أداء دوري لا معالجة تقنية بعدية فقط"]},
+    {axis:2, axisTitle:"مثلث CIA والمبادئ التكميلية", importance:"high", type:"essay",
+     q:"ناقش لماذا لا تكفي الحلول التقنية وحدها لحماية المؤسسات من التهديدات السيبرانية، مع الإشارة إلى دور السياسات والوعي البشري ودور القيادة العليا.",
+     modelAnswer:"أغلب الحوادث تبدأ بخطأ بشري لا بثغرة تقنية بحتة (تصيد، كلمات مرور ضعيفة). الحلول التقنية بلا سياسات وتدريب تبقى غير مكتملة؛ والقيادة العليا مسؤولة عن اعتماد السياسات وتخصيص الموارد وربط الأمن بأهداف المؤسسة، وهذا ما لا تستطيع أي أداة تقنية فعله بمفردها.",
+     keyPoints:["أغلب الحوادث تبدأ بخطأ بشري لا بثغرة تقنية بحتة","الحلول التقنية بلا سياسات وتدريب غير مكتملة","دور القيادة العليا في اعتماد السياسات وربط الأمن بالحوكمة"]}
+  ];
+
+  // ============ QUIZ STATE ============
+  let quizPool = [];
+  let currentIndex = 0;
+  let score = 0;
+  let answered = false;
+  let axisStats = {};
+
+  function shuffle(arr){
+    const a = arr.slice();
+    for(let i=a.length-1;i>0;i--){
+      const j = Math.floor(Math.random()*(i+1));
+      [a[i],a[j]] = [a[j],a[i]];
+    }
+    return a;
+  }
+
+  function startQuiz(){
+    const count = document.querySelector('input[name="qcount"]:checked').value;
+    const type = document.querySelector('input[name="qtype"]:checked').value;
+    const focus = document.querySelector('input[name="qfocus"]:checked').value;
+
+    let pool = QUESTION_BANK.slice();
+
+    if(focus === "high"){
+      pool = pool.filter(q => q.importance === "high");
+    }
+    if(type === "objective"){
+      pool = pool.filter(q => q.type === "mcq" || q.type === "tf");
+    } else if(type === "mcq"){
+      pool = pool.filter(q => q.type === "mcq");
+    } else if(type === "tf"){
+      pool = pool.filter(q => q.type === "tf");
+    } else if(type === "essay"){
+      pool = pool.filter(q => q.type === "essay");
+    } else if(type === "scenario"){
+      pool = pool.filter(q => q.type === "scenario");
+    }
+    // "mixed_all" => no filtering, keep every type
+
+    pool = shuffle(pool);
+
+    if(count !== "all"){
+      const n = parseInt(count,10);
+      pool = pool.slice(0, Math.min(n, pool.length));
+    }
+
+    if(pool.length === 0){
+      alert("لا توجد أسئلة مطابقة لهذا الاختيار، الرجاء تعديل الفلاتر.");
+      return;
+    }
+
+    quizPool = pool;
+    currentIndex = 0;
+    score = 0;
+    axisStats = {};
+
+    document.getElementById('quiz-setup').classList.add('hidden');
+    document.getElementById('quiz-result').classList.add('hidden');
+    document.getElementById('quiz-question').classList.remove('hidden');
+
+    renderQuestion();
+  }
+
+  function renderQuestion(){
+    answered = false;
+    const q = quizPool[currentIndex];
+
+    if(!axisStats[q.axis]) axisStats[q.axis] = {title:q.axisTitle, correct:0, total:0};
+    axisStats[q.axis].total++;
+
+    document.getElementById('q-progress-text').textContent = `السؤال ${currentIndex+1} من ${quizPool.length}`;
+    document.getElementById('q-progress-fill').style.width = `${(currentIndex/quizPool.length)*100}%`;
+    document.getElementById('q-score-text').textContent = `النتيجة: ${formatScore(score)}`;
+
+    const tag = document.getElementById('q-axis-tag');
+    tag.textContent = `المحور ${q.axis}: ${q.axisTitle}`;
+    tag.className = 'quiz-axis-tag' + (q.importance === 'high' ? ' high' : '');
+
+    document.getElementById('q-question-text').textContent = q.q;
+
+    const wrap = document.getElementById('q-options-wrap');
+    wrap.innerHTML = '';
+
+    if(q.type === 'mcq'){
+      q.options.forEach((opt, idx) => {
+        const btn = document.createElement('button');
+        btn.className = 'quiz-opt-btn';
+        btn.textContent = opt;
+        btn.onclick = () => selectAnswer(idx === q.correct, btn, idx);
+        wrap.appendChild(btn);
+      });
+    } else if(q.type === 'tf'){
+      const row = document.createElement('div');
+      row.className = 'tf-row';
+      const trueBtn = document.createElement('button');
+      trueBtn.className = 'quiz-opt-btn';
+      trueBtn.textContent = 'صحيح ✓';
+      trueBtn.onclick = () => selectAnswer(q.correct === true, trueBtn, true);
+      const falseBtn = document.createElement('button');
+      falseBtn.className = 'quiz-opt-btn';
+      falseBtn.textContent = 'خطأ ✗';
+      falseBtn.onclick = () => selectAnswer(q.correct === false, falseBtn, false);
+      row.appendChild(trueBtn);
+      row.appendChild(falseBtn);
+      wrap.appendChild(row);
+    } else {
+      // essay / scenario
+      const textarea = document.createElement('textarea');
+      textarea.className = 'quiz-essay-textarea';
+      textarea.id = 'q-essay-input';
+      textarea.placeholder = q.type === 'scenario'
+        ? 'اكتب تحليلك للسيناريو هنا قبل مقارنته بالإجابة النموذجية...'
+        : 'اكتب إجابتك المقالية هنا قبل مقارنتها بالإجابة النموذجية...';
+      wrap.appendChild(textarea);
+
+      const compareBtn = document.createElement('button');
+      compareBtn.className = 'start-btn';
+      compareBtn.style.marginTop = '12px';
+      compareBtn.textContent = 'قارن إجابتي بالإجابة النموذجية ⇄';
+      compareBtn.onclick = () => compareEssay(q, compareBtn);
+      wrap.appendChild(compareBtn);
+
+      const compareArea = document.createElement('div');
+      compareArea.id = 'q-compare-area';
+      wrap.appendChild(compareArea);
+    }
+
+    document.getElementById('q-feedback').classList.remove('show','correct-fb','incorrect-fb');
+    document.getElementById('q-next-btn').classList.add('hidden');
+  }
+
+  function selectAnswer(isCorrect, clickedBtn, chosenValue){
+    if(answered) return;
+    answered = true;
+
+    const q = quizPool[currentIndex];
+    const wrap = document.getElementById('q-options-wrap');
+    const allBtns = wrap.querySelectorAll('.quiz-opt-btn');
+    allBtns.forEach(b => b.disabled = true);
+
+    if(isCorrect){
+      score++;
+      axisStats[q.axis].correct++;
+      clickedBtn.classList.add('correct');
+    } else {
+      clickedBtn.classList.add('incorrect');
+      // highlight the correct one too
+      if(q.type === 'mcq'){
+        allBtns[q.correct].classList.add('correct');
+      } else {
+        allBtns.forEach(b => {
+          const wantsTrue = b.textContent.includes('صحيح');
+          if(wantsTrue === q.correct) b.classList.add('correct');
+        });
+      }
+    }
+
+    const fb = document.getElementById('q-feedback');
+    fb.classList.add('show', isCorrect ? 'correct-fb' : 'incorrect-fb');
+    document.getElementById('q-feedback-title').textContent = isCorrect ? '✔ إجابة صحيحة' : '✘ إجابة غير دقيقة';
+    document.getElementById('q-feedback-body').textContent = q.fb;
+    document.getElementById('q-feedback-ref').textContent = `المرجع: محتوى المحاضرة — المحور ${q.axis} (${q.axisTitle}).`;
+
+    document.getElementById('q-score-text').textContent = `النتيجة: ${score}`;
+    document.getElementById('q-next-btn').classList.remove('hidden');
+    document.getElementById('q-next-btn').textContent = (currentIndex === quizPool.length-1) ? 'عرض النتيجة النهائية ◀' : 'السؤال التالي ◀';
+  }
+
+  function compareEssay(q, btn){
+    if(answered) return;
+    btn.disabled = true;
+    btn.textContent = 'تمت المقارنة ✓';
+
+    const userText = document.getElementById('q-essay-input').value.trim();
+    document.getElementById('q-essay-input').disabled = true;
+
+    const area = document.getElementById('q-compare-area');
+    area.innerHTML = `
+      <div class="compare-grid">
+        <div class="compare-box mine">
+          <h6>✍️ إجابتك</h6>
+          <div>${userText ? userText.replace(/</g,'&lt;') : '<em>(لم تُكتب إجابة قبل المقارنة)</em>'}</div>
+        </div>
+        <div class="compare-box model">
+          <h6>📘 الإجابة النموذجية</h6>
+          <div>${q.modelAnswer}</div>
+        </div>
+      </div>
+      <div class="key-points-box">
+        <h6>🔑 عناصر تقييم رئيسية ينبغي أن تتضمنها إجابة متكاملة</h6>
+        <ul>${q.keyPoints.map(p => `<li>${p}</li>`).join('')}</ul>
+      </div>
+      <div class="self-rate-wrap">
+        <p>قيّم إجابتك ذاتيًا بمقارنتها بعناصر التقييم أعلاه:</p>
+        <button class="rate-btn r0" onclick="selfRate(0, this, ${q.axis})">ضعيفة (٠٪)</button>
+        <button class="rate-btn r50" onclick="selfRate(0.5, this, ${q.axis})">متوسطة (٥٠٪)</button>
+        <button class="rate-btn r75" onclick="selfRate(0.75, this, ${q.axis})">جيدة (٧٥٪)</button>
+        <button class="rate-btn r100" onclick="selfRate(1, this, ${q.axis})">ممتازة (١٠٠٪)</button>
+      </div>
+    `;
+  }
+
+  function selfRate(points, btn, axisNum){
+    if(answered) return;
+    answered = true;
+
+    document.querySelectorAll('.rate-btn').forEach(b => b.classList.remove('selected'));
+    btn.classList.add('selected');
+
+    score += points;
+    axisStats[axisNum].correct += points;
+
+    const fb = document.getElementById('q-feedback');
+    const isGood = points >= 0.75;
+    fb.classList.add('show', isGood ? 'correct-fb' : 'incorrect-fb');
+    document.getElementById('q-feedback-title').textContent = isGood ? '✔ تقييم ذاتي جيد' : '↻ راجع عناصر التقييم أعلاه لتحسين إجابتك مستقبلاً';
+    document.getElementById('q-feedback-body').textContent = `درجتك الذاتية لهذا السؤال: ${Math.round(points*100)}٪ من الدرجة الكاملة.`;
+    document.getElementById('q-feedback-ref').textContent = `المرجع: محتوى المحاضرة — المحور ${quizPool[currentIndex].axis} (${quizPool[currentIndex].axisTitle}).`;
+
+    document.getElementById('q-score-text').textContent = `النتيجة: ${formatScore(score)}`;
+    document.getElementById('q-next-btn').classList.remove('hidden');
+    document.getElementById('q-next-btn').textContent = (currentIndex === quizPool.length-1) ? 'عرض النتيجة النهائية ◀' : 'السؤال التالي ◀';
+  }
+
+  function formatScore(s){
+    return (Math.round(s*100)/100).toString().replace('.', ',');
+  }
+
+  function nextQuestion(){
+    currentIndex++;
+    if(currentIndex >= quizPool.length){
+      showResult();
+    } else {
+      renderQuestion();
+    }
+  }
+
+  function showResult(){
+    document.getElementById('quiz-question').classList.add('hidden');
+    document.getElementById('quiz-result').classList.remove('hidden');
+
+    const total = quizPool.length;
+    const pct = Math.round((score/total)*100);
+
+    document.getElementById('result-circle').style.setProperty('--pct', pct);
+    document.getElementById('result-num').textContent = `${formatScore(score)}/${total}`;
+
+    let msg = '';
+    if(pct >= 85) msg = '🏅 ممتاز — إتقان واضح للمحاور القانونية للمحاضرة.';
+    else if(pct >= 65) msg = '👍 جيد — استيعاب جيد، مع مراجعة المحاور التي أخطأت فيها.';
+    else msg = '📘 يحتاج إلى مراجعة — يُنصح بإعادة قراءة تبويب "المحاضرة الأولى (تفصيلي)" قبل إعادة المحاولة.';
+    document.getElementById('result-msg').textContent = `${msg} (النسبة: ${pct}%)`;
+
+    const tbody = document.getElementById('result-breakdown-body');
+    tbody.innerHTML = '';
+    Object.keys(axisStats).sort((a,b)=>a-b).forEach(axisNum => {
+      const s = axisStats[axisNum];
+      const tr = document.createElement('tr');
+      tr.innerHTML = `<td>المحور ${axisNum}: ${s.title}</td><td class="num">${formatScore(s.correct)}</td><td class="num">${s.total}</td>`;
+      tbody.appendChild(tr);
+    });
+  }
+
+  function restartQuiz(){
+    document.getElementById('quiz-result').classList.add('hidden');
+    document.getElementById('quiz-question').classList.add('hidden');
+    document.getElementById('quiz-setup').classList.remove('hidden');
+  }
+</script>
+
+</body>
+</html>
