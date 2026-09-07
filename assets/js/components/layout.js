@@ -8,14 +8,39 @@
 
   function site() { return DLP.config.site; }
 
+  /** قائمة روابط التنقل الموحّدة (تُستخدم في الهيدر، الشريط الجانبي، وشريط الجوال السفلي). */
+  function navItems() {
+    var subjects = DLP.store.subjects();
+    return {
+      home: { href: '#/', icon: '🏠', label: t('nav.home') },
+      subjects: subjects.map(function (subject) {
+        return { href: '#/subject/' + subject.id, icon: subject.icon || '📘', label: subject.shortTitle || subject.title, title: subject.title };
+      }),
+      more: [
+        { href: '#/library', icon: '📚', label: t('nav.library'), badge: t('common.comingSoon') },
+        { href: '#/assistant', icon: '🤖', label: t('nav.assistant'), badge: t('common.comingSoon') },
+        { href: '#/certificates', icon: '🎓', label: t('nav.certificates'), badge: t('common.comingSoon') },
+        { href: '#/about', icon: 'ℹ️', label: t('nav.about') },
+        { href: '#/about?focus=contact', icon: '✉️', label: t('nav.contact') }
+      ]
+    };
+  }
+
   function renderHeader() {
     var s = site();
-    var subjects = DLP.store.subjects();
-    var links = [{ href: '#/', label: t('nav.home') }]
-      .concat(subjects.map(function (subject) {
-        return { href: '#/subject/' + subject.id, label: subject.shortTitle || subject.title, title: subject.title };
-      }))
-      .concat([{ href: '#/about', label: t('nav.about') }]);
+    var nav = navItems();
+    // الشريط الجانبي (Desktop) يعرض القائمة كاملة؛ شريط الهيدر العلوي يبقى مختصراً على
+    // الشاشات الواسعة (الرئيسية + المواد + من نحن) لتفادي الازدواج، مع بقاء القائمة
+    // الكاملة في قائمة الجوال المنسدلة (نفس <nav id="mainNav">).
+    var extraHrefs = ['#/library', '#/assistant', '#/certificates'];
+    var links = [nav.home].concat(nav.subjects).concat(nav.more
+      .filter(function (item) { return item.href !== '#/about?focus=contact'; })
+      .map(function (item) {
+        if (extraHrefs.indexOf(item.href) !== -1) {
+          return { href: item.href, label: item.label, title: item.title, extra: true };
+        }
+        return item;
+      }));
 
     return '' +
       '<a class="skip-link" href="#main">' + esc(t('nav.skip')) + '</a>' +
@@ -28,13 +53,16 @@
               '<span class="brand-sub">' + esc(s.program) + '</span>' +
             '</span>' +
           '</a>' +
+          '<button class="theme-toggle" id="themeToggle" type="button" aria-pressed="false" aria-label="' + esc(t('theme.toggle')) + '" title="' + esc(t('theme.toggle')) + '">' +
+            '<span aria-hidden="true" id="themeToggleIcon">🌙</span>' +
+          '</button>' +
           '<button class="nav-toggle" id="navToggle" type="button" aria-expanded="false" aria-controls="mainNav">' +
             '☰ ' + esc(t('nav.menu')) +
           '</button>' +
           '<nav class="main-nav" id="mainNav" aria-label="' + esc(t('nav.menu')) + '">' +
             '<ul class="nav-list">' +
               links.map(function (link) {
-                return '<li><a class="nav-link" href="' + esc(link.href) + '"' +
+                return '<li><a class="nav-link' + (link.extra ? ' nav-link-extra' : '') + '" href="' + esc(link.href) + '"' +
                   (link.title ? ' title="' + esc(link.title) + '"' : '') + '>' + esc(link.label) + '</a></li>';
               }).join('') +
             '</ul>' +
@@ -86,6 +114,56 @@
           '</div>' +
         '</div>' +
       '</footer>';
+  }
+
+  /** الشريط الجانبي (Desktop، مع وضع مطوي). */
+  function renderSidebar() {
+    var nav = navItems();
+    function link(item) {
+      return '<a class="side-link" href="' + esc(item.href) + '"' +
+        (item.title ? ' title="' + esc(item.title) + '"' : '') + '>' +
+          '<span class="side-icon" aria-hidden="true">' + esc(item.icon) + '</span>' +
+          '<span class="side-label">' + esc(item.label) + '</span>' +
+          (item.badge ? '<span class="side-badge">' + esc(item.badge) + '</span>' : '') +
+        '</a>';
+    }
+    return '' +
+      '<nav class="app-sidebar" id="appSidebar" aria-label="' + esc(t('nav.menu')) + '">' +
+        link(nav.home) +
+        '<div class="side-group-title">' + esc(t('nav.subjects')) + '</div>' +
+        nav.subjects.map(link).join('') +
+        '<div class="side-group-title">' + esc(t('nav.bottomMenu')) + '</div>' +
+        nav.more.map(link).join('') +
+        '<button class="sidebar-toggle" id="sidebarToggle" type="button" aria-pressed="false">' +
+          '<span aria-hidden="true" id="sidebarToggleIcon">⇤</span>' +
+          '<span id="sidebarToggleLabel">' + esc(t('nav.sidebarCollapse')) + '</span>' +
+        '</button>' +
+      '</nav>';
+  }
+
+  /** شريط التنقل السفلي (الجوال). */
+  function renderBottomNav() {
+    var nav = navItems();
+    var items = [
+      nav.home,
+      { href: '#/search', icon: '🔍', label: t('search.button') },
+      { href: '#/library', icon: '📚', label: t('nav.library') },
+      { href: '#bottomMenuTrigger', icon: '☰', label: t('nav.bottomMenu'), isMenu: true }
+    ];
+    return '' +
+      '<nav class="bottom-nav" aria-label="' + esc(t('nav.menu')) + '">' +
+        '<ul class="bottom-nav-list">' +
+          items.map(function (item) {
+            return '<li>' + (item.isMenu
+              ? '<button class="bottom-nav-link" type="button" id="bottomMenuTrigger">' +
+                  '<span class="bn-icon" aria-hidden="true">' + esc(item.icon) + '</span>' + esc(item.label) +
+                '</button>'
+              : '<a class="bottom-nav-link" href="' + esc(item.href) + '">' +
+                  '<span class="bn-icon" aria-hidden="true">' + esc(item.icon) + '</span>' + esc(item.label) +
+                '</a>') + '</li>';
+          }).join('') +
+        '</ul>' +
+      '</nav>';
   }
 
   /** أزرار "الرجوع إلى أعلى" و"الرئيسية" في نهاية الصفحة. */
@@ -154,11 +232,64 @@
       var trigger = event.target.closest('[data-action="scroll-top"]');
       if (trigger) { scrollTop(); }
     });
+
+    bindThemeToggle();
+    bindSidebar();
+
+    var bottomMenuTrigger = document.getElementById('bottomMenuTrigger');
+    if (bottomMenuTrigger && toggle) {
+      bottomMenuTrigger.addEventListener('click', function () { toggle.click(); });
+    }
   }
 
-  /** تحديث الرابط النشط في شريط التنقل. */
+  /** مفتاح الوضع الداكن/الفاتح — يُطبَّق مبكراً في theme-init.js، وهنا يُفعَّل التبديل والحفظ فقط. */
+  function bindThemeToggle() {
+    var btn = document.getElementById('themeToggle');
+    var icon = document.getElementById('themeToggleIcon');
+    if (!btn) { return; }
+    function isDark() { return document.documentElement.getAttribute('data-theme') === 'dark'; }
+    function sync() {
+      var dark = isDark();
+      btn.setAttribute('aria-pressed', dark ? 'true' : 'false');
+      btn.setAttribute('aria-label', dark ? t('theme.light') : t('theme.dark'));
+      btn.setAttribute('title', dark ? t('theme.light') : t('theme.dark'));
+      if (icon) { icon.textContent = dark ? '☀️' : '🌙'; }
+    }
+    btn.addEventListener('click', function () {
+      var next = isDark() ? 'light' : 'dark';
+      document.documentElement.setAttribute('data-theme', next);
+      try { global.localStorage.setItem('dlp.theme', next); } catch (e) { /* تجاهل غياب التخزين المحلي */ }
+      sync();
+    });
+    sync();
+  }
+
+  /** طي/توسيع الشريط الجانبي (Desktop) — حالة محفوظة عبر الجلسات. */
+  function bindSidebar() {
+    var sidebar = document.getElementById('appSidebar');
+    var toggle = document.getElementById('sidebarToggle');
+    var icon = document.getElementById('sidebarToggleIcon');
+    var label = document.getElementById('sidebarToggleLabel');
+    if (!sidebar || !toggle) { return; }
+    function apply(collapsed) {
+      sidebar.classList.toggle('collapsed', collapsed);
+      toggle.setAttribute('aria-pressed', collapsed ? 'true' : 'false');
+      if (icon) { icon.textContent = collapsed ? '⇥' : '⇤'; }
+      if (label) { label.textContent = collapsed ? t('nav.sidebarExpand') : t('nav.sidebarCollapse'); }
+    }
+    var saved;
+    try { saved = global.localStorage.getItem('dlp.sidebar.collapsed') === '1'; } catch (e) { saved = false; }
+    apply(saved);
+    toggle.addEventListener('click', function () {
+      var collapsed = !sidebar.classList.contains('collapsed');
+      apply(collapsed);
+      try { global.localStorage.setItem('dlp.sidebar.collapsed', collapsed ? '1' : '0'); } catch (e) { /* تجاهل */ }
+    });
+  }
+
+  /** تحديث الرابط النشط في كل عناصر التنقل (الهيدر، الشريط الجانبي، شريط الجوال). */
   function syncActiveNav(path) {
-    var links = document.querySelectorAll('.nav-link');
+    var links = document.querySelectorAll('.nav-link, .side-link, .bottom-nav-link[href]');
     Array.prototype.forEach.call(links, function (link) {
       var href = link.getAttribute('href').replace(/^#/, '');
       var active = href === path || (href !== '/' && path.indexOf(href) === 0);
@@ -170,6 +301,8 @@
   DLP.layout = {
     renderHeader: renderHeader,
     renderFooter: renderFooter,
+    renderSidebar: renderSidebar,
+    renderBottomNav: renderBottomNav,
     endActions: endActions,
     breadcrumbs: breadcrumbs,
     bindShell: bindShell,

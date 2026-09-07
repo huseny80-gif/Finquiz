@@ -8,9 +8,10 @@
   var SITE = {
     id: 'digital-leadership-course-2',
     brand: {
-      name: 'القيادة الرقمية',
+      name: 'القيادة الرقمية والحوكمة الذكية',
+      tagline: 'Digital Leadership & Smart Governance',
       logoImage: 'assets/img/logo.webp',
-      logoAlt: 'شعار منصة القيادة الرقمية'
+      logoAlt: 'شعار منصة القيادة الرقمية والحوكمة الذكية'
     },
     program: 'الدبلوم العالي المهني في القيادة الرقمية',
     course: 'مواد الكورس الثاني',
