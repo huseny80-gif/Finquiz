@@ -86,6 +86,21 @@
     focusTarget(query);
   }
 
+  function renderLibrary() {
+    setTitle([t('nav.library')], t('library.intro'));
+    paint(DLP.libraryView.render());
+  }
+
+  function renderAssistant() {
+    setTitle([t('nav.assistant')], t('assistant.intro'));
+    paint(DLP.assistantView.render());
+  }
+
+  function renderCertificates() {
+    setTitle([t('nav.certificates')], t('certificates.intro'));
+    paint(DLP.certificatesView.render());
+  }
+
   /** تمرير التركيز إلى عنصر محدّد عبر ?focus= */
   function focusTarget(query) {
     if (!query || !query.focus) { return; }
@@ -110,11 +125,16 @@
     // بناء الهيكل الثابت مرة واحدة
     el('shellHeader').innerHTML = DLP.layout.renderHeader();
     el('shellFooter').innerHTML = DLP.layout.renderFooter();
+    el('shellSidebar').outerHTML = DLP.layout.renderSidebar();
+    el('shellBottomNav').innerHTML = DLP.layout.renderBottomNav();
     DLP.layout.bindShell();
 
     DLP.router.add('/', renderHome);
     DLP.router.add('/search', renderSearch);
     DLP.router.add('/about', renderAbout);
+    DLP.router.add('/library', renderLibrary);
+    DLP.router.add('/assistant', renderAssistant);
+    DLP.router.add('/certificates', renderCertificates);
     DLP.router.add('/subject/:id', renderSubject);
     DLP.router.add('/subject/:id/:section', renderSubject);
     DLP.router.setNotFound(renderNotFound);

@@ -24,6 +24,7 @@
 <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;700;800;900&family=Tajawal:wght@400;500;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="assets/css/styles.css">
 <link rel="icon" type="image/webp" href="assets/img/favicon.webp">
+<script src="assets/js/core/theme-init.js"></script>
 </head>
 <body>
 
@@ -32,9 +33,13 @@
 <!-- يُعلن تغيّر الصفحة لقارئات الشاشة -->
 <div id="routeAnnouncer" class="visually-hidden" role="status" aria-live="polite" aria-atomic="true"></div>
 
-<main id="main" tabindex="-1"></main>
+<div class="app-shell">
+  <aside id="shellSidebar"></aside>
+  <main id="main" class="app-main" tabindex="-1"></main>
+</div>
 
 <div id="shellFooter"></div>
+<div id="shellBottomNav"></div>
 
 <button class="fab-top" id="fabTop" type="button" aria-label="الرجوع إلى أعلى الصفحة" title="الرجوع إلى أعلى">↑</button>
 
@@ -75,6 +80,9 @@
 <script src="assets/js/components/search-view.js"></script>
 <script src="assets/js/components/home.js"></script>
 <script src="assets/js/components/about.js"></script>
+<script src="assets/js/components/library.js"></script>
+<script src="assets/js/components/assistant.js"></script>
+<script src="assets/js/components/certificates.js"></script>
 
 <!-- ============ التشغيل ============ -->
 <script src="assets/js/app.js"></script>
