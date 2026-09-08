@@ -116,11 +116,18 @@
     return questions.filter(function (q) { return q.difficulty === difficulty; });
   }
 
+  /** تصفية الأسئلة حسب المحاضرة ('all' لكل المحاضرات). أسئلة بلا lectureId تُحتسب ضمن الكل فقط. */
+  function filterByLecture(questions, lectureId) {
+    if (!lectureId || lectureId === 'all') { return questions.slice(); }
+    return questions.filter(function (q) { return q.lectureId === lectureId; });
+  }
+
   DLP.quiz = {
     grade: grade,
     score: score,
     correctAnswerOf: correctAnswerOf,
-    filterByDifficulty: filterByDifficulty
+    filterByDifficulty: filterByDifficulty,
+    filterByLecture: filterByLecture
   };
 
   if (typeof module !== 'undefined' && module.exports) { module.exports = DLP.quiz; }

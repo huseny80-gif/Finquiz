@@ -101,7 +101,7 @@
         description: 'أسئلة تفاعلية حول مفهوم الخطر وتقييمه واستراتيجيات معالجته.',
         questions: [
           {
-            id: 'rm-q1-1', type: 'mcq', difficulty: 'easy',
+            id: 'rm-q1-1', lectureId: 'rm-l1', type: 'mcq', difficulty: 'easy',
             prompt: 'ما الفرق بين الخطر والمشكلة؟',
             options: [
               'الخطر وقع فعلاً والمشكلة محتملة',
@@ -113,19 +113,19 @@
             explanation: 'الخطر احتمالي مستقبلي يُدار استباقياً، أما المشكلة فواقعة حاليّة تُعالَج آنياً.'
           },
           {
-            id: 'rm-q1-2', type: 'tf', difficulty: 'easy',
+            id: 'rm-q1-2', lectureId: 'rm-l1', type: 'tf', difficulty: 'easy',
             prompt: 'جميع المخاطر سلبية بطبيعتها ولا يمكن أن تمثّل فرصة.',
             answer: false,
             explanation: 'الخطر أثر محتمل على الأهداف، وقد يكون إيجابياً؛ ولذلك تُدار الفرص ضمن إدارة المخاطر.'
           },
           {
-            id: 'rm-q1-3', type: 'fill', difficulty: 'medium',
+            id: 'rm-q1-3', lectureId: 'rm-l1', type: 'fill', difficulty: 'medium',
             prompt: 'يُحسب مستوى الخطر بحاصل ضرب الاحتمال في ............',
             answer: ['الأثر', 'الاثر', 'التأثير'],
             explanation: 'معادلة الخطر الأساسية: مستوى الخطر = الاحتمال × الأثر.'
           },
           {
-            id: 'rm-q1-4', type: 'match', difficulty: 'medium',
+            id: 'rm-q1-4', lectureId: 'rm-l2', type: 'match', difficulty: 'medium',
             prompt: 'طابق كل استراتيجية معالجة بمثالها.',
             pairs: [
               { left: 'التجنّب', right: 'إلغاء نشاط عالي الخطورة من خطة المشروع' },
@@ -136,13 +136,13 @@
             explanation: 'الاستراتيجيات الأربع تُختار وفق مستوى الخطر وكلفة المعالجة وشهية المخاطر.'
           },
           {
-            id: 'rm-q1-5', type: 'order', difficulty: 'hard',
+            id: 'rm-q1-5', lectureId: 'rm-l1', type: 'order', difficulty: 'hard',
             prompt: 'رتّب مراحل دورة إدارة المخاطر بالترتيب الصحيح.',
             items: ['تحديد المخاطر', 'تحليل المخاطر', 'تقييم المخاطر وترتيب أولوياتها', 'معالجة المخاطر', 'المراقبة والمراجعة'],
             explanation: 'الدورة تبدأ بتحديد المخاطر وتنتهي بالمراقبة والمراجعة المستمرة التي تغذّي الدورة من جديد.'
           },
           {
-            id: 'rm-q1-6', type: 'mcq', difficulty: 'hard',
+            id: 'rm-q1-6', lectureId: 'rm-l2', type: 'mcq', difficulty: 'hard',
             prompt: 'خطر احتماله منخفض جداً وأثره كارثي على استمرارية الخدمة. ما المعالجة الأنسب؟',
             options: [
               'قبوله لانخفاض احتماله',

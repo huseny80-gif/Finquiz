@@ -513,6 +513,7 @@
       "questions": [
         {
           "id": "ip-q1-1",
+          "lectureId": "ip-l1",
           "type": "mcq",
           "difficulty": "easy",
           "prompt": "ما الفرق بين الاختراع والابتكار؟",
@@ -527,6 +528,7 @@
         },
         {
           "id": "ip-q1-2",
+          "lectureId": "ip-l2",
           "type": "tf",
           "difficulty": "easy",
           "prompt": "توسيع نطاق المشروع دون تعديل الزمن والكلفة ممارسة سليمة تزيد قيمة المشروع.",
@@ -535,6 +537,7 @@
         },
         {
           "id": "ip-q1-3",
+          "lectureId": "ip-l2",
           "type": "fill",
           "difficulty": "medium",
           "prompt": "الوثيقة التي تعتمد انطلاق المشروع وتحدّد هدفه ونطاقه وأصحاب المصلحة تسمّى ............ المشروع.",
@@ -546,6 +549,7 @@
         },
         {
           "id": "ip-q1-4",
+          "lectureId": "ip-l2",
           "type": "match",
           "difficulty": "medium",
           "prompt": "طابق كل مرحلة من مراحل المشروع بنشاطها الأبرز.",
@@ -575,6 +579,7 @@
         },
         {
           "id": "ip-q1-5",
+          "lectureId": "ip-l2",
           "type": "order",
           "difficulty": "hard",
           "prompt": "رتّب مراحل دورة حياة المشروع بالترتيب الصحيح.",
@@ -589,6 +594,7 @@
         },
         {
           "id": "ip-q1-6",
+          "lectureId": "ip-l2",
           "type": "mcq",
           "difficulty": "hard",
           "prompt": "مشروع رقمي متطلباته متغيّرة باستمرار ويحتاج تسليماً مبكراً للقيمة. أي منهج أنسب؟",
@@ -603,6 +609,7 @@
         },
         {
           "id": "ip-q1-7",
+          "lectureId": "ip-l1",
           "type": "mcq",
           "difficulty": "medium",
           "prompt": "الفرق الجوهري بين الاختراع والابتكار هو أن الابتكار:",
@@ -617,6 +624,7 @@
         },
         {
           "id": "ip-q1-8",
+          "lectureId": "ip-l1",
           "type": "mcq",
           "difficulty": "medium",
           "prompt": "«ابتكار نموذج الأعمال» يعني تحديدًا:",
@@ -631,6 +639,7 @@
         },
         {
           "id": "ip-q1-9",
+          "lectureId": "ip-l1",
           "type": "mcq",
           "difficulty": "medium",
           "prompt": "أي مما يلي ليس من مكونات الاقتصاد الرقمي بحسب المحاضرة؟",
@@ -645,6 +654,7 @@
         },
         {
           "id": "ip-q1-10",
+          "lectureId": "ip-l1",
           "type": "mcq",
           "difficulty": "medium",
           "prompt": "من مراحل المشروع الرقمي، تأتي «دراسة الجدوى» مباشرة بعد:",
@@ -659,6 +669,7 @@
         },
         {
           "id": "ip-q1-11",
+          "lectureId": "ip-l2",
           "type": "mcq",
           "difficulty": "medium",
           "prompt": "منهجية Agile تعتمد بصورة أساسية على:",
@@ -673,6 +684,7 @@
         },
         {
           "id": "ip-q1-12",
+          "lectureId": "ip-l3",
           "type": "mcq",
           "difficulty": "medium",
           "prompt": "«الابتكار المفتوح» (Open Innovation) يعني:",
@@ -687,6 +699,7 @@
         },
         {
           "id": "ip-q1-13",
+          "lectureId": "ip-l1",
           "type": "mcq",
           "difficulty": "medium",
           "prompt": "في نموذج «فكرة ← ابتكار ← فرصة اقتصادية ← مشروع رقمي ← قيمة اقتصادية ← نمو وتوسع»، ما الذي يربط الابتكار بريادة الأعمال؟",
@@ -701,6 +714,7 @@
         },
         {
           "id": "ip-q1-14",
+          "lectureId": "ip-l1",
           "type": "tf",
           "difficulty": "medium",
           "prompt": "يعني الابتكار مجرد إنتاج فكرة جديدة ومبتكرة دون الحاجة لتطبيقها.",
@@ -709,6 +723,7 @@
         },
         {
           "id": "ip-q1-15",
+          "lectureId": "ip-l1",
           "type": "tf",
           "difficulty": "medium",
           "prompt": "من خصائص المشاريع الرقمية ارتفاع مستوى عدم اليقين وسرعة التغيّر.",
@@ -717,6 +732,7 @@
         },
         {
           "id": "ip-q1-16",
+          "lectureId": "ip-l2",
           "type": "tf",
           "difficulty": "medium",
           "prompt": "Scrum منهجية بديلة تمامًا عن Agile ولا علاقة بينهما.",
@@ -725,6 +741,7 @@
         },
         {
           "id": "ip-q1-17",
+          "lectureId": "ip-l1",
           "type": "tf",
           "difficulty": "medium",
           "prompt": "يمكن للمشاريع الصغيرة الوصول إلى أسواق واسعة بفضل انخفاض تكاليف التكنولوجيا الرقمية.",
@@ -733,6 +750,7 @@
         },
         {
           "id": "ip-q1-18",
+          "lectureId": "ip-l1",
           "type": "tf",
           "difficulty": "medium",
           "prompt": "ينبغي النظر إلى الابتكار الرقمي بوصفه وسيلة لزيادة الأرباح فقط، بمعزل عن الاستدامة.",
@@ -741,6 +759,7 @@
         },
         {
           "id": "ip-q1-19",
+          "lectureId": "ip-l1",
           "type": "open",
           "difficulty": "hard",
           "kind": "سيناريو",
@@ -755,6 +774,7 @@
         },
         {
           "id": "ip-q1-20",
+          "lectureId": "ip-l2",
           "type": "open",
           "difficulty": "hard",
           "kind": "سيناريو",
@@ -769,6 +789,7 @@
         },
         {
           "id": "ip-q1-21",
+          "lectureId": "ip-l3",
           "type": "open",
           "difficulty": "hard",
           "kind": "مقالي",
@@ -783,6 +804,7 @@
         },
         {
           "id": "ip-q1-22",
+          "lectureId": "ip-l1",
           "type": "open",
           "difficulty": "hard",
           "kind": "مقالي",
@@ -797,6 +819,7 @@
         },
         {
           "id": "ip-q1-23",
+          "lectureId": "ip-l3",
           "type": "mcq",
           "difficulty": "medium",
           "prompt": "ما الفرق الجوهري بين الابتكار التدريجي والابتكار الجذري؟",
@@ -811,6 +834,7 @@
         },
         {
           "id": "ip-q1-24",
+          "lectureId": "ip-l3",
           "type": "tf",
           "difficulty": "medium",
           "prompt": "مفهوم «التدمير الخلّاق» الذي صاغه شومبيتر يصف كيف يزيح الابتكار الجذري المنتجات والتقنيات القائمة كلياً.",
@@ -819,6 +843,7 @@
         },
         {
           "id": "ip-q1-25",
+          "lectureId": "ip-l3",
           "type": "fill",
           "difficulty": "medium",
           "prompt": "الوحدات التنظيمية المستقلة التي تُستخدم لفصل الابتكار الجذري عن الضغوط التشغيلية اليومية تسمّى المنظمات ............",
@@ -827,6 +852,7 @@
         },
         {
           "id": "ip-q1-26",
+          "lectureId": "ip-l3",
           "type": "match",
           "difficulty": "medium",
           "prompt": "طابق كل بُعد من أبعاد الابتكار المفتوح بتعريفه.",
@@ -839,6 +865,7 @@
         },
         {
           "id": "ip-q1-27",
+          "lectureId": "ip-l3",
           "type": "mcq",
           "difficulty": "medium",
           "prompt": "من صاغ نموذج الابتكار المفتوح (Open Innovation)؟",
@@ -853,6 +880,7 @@
         },
         {
           "id": "ip-q1-28",
+          "lectureId": "ip-l3",
           "type": "mcq",
           "difficulty": "medium",
           "prompt": "نموذج الابتكار المستمر يستمد أصوله بشكل خاص من فلسفات:",
@@ -867,6 +895,7 @@
         },
         {
           "id": "ip-q1-29",
+          "lectureId": "ip-l3",
           "type": "tf",
           "difficulty": "medium",
           "prompt": "في نموذج الابتكار المستمر، الابتكار مسؤولية قسم البحث والتطوير وحده دون بقية العاملين.",
@@ -875,6 +904,7 @@
         },
         {
           "id": "ip-q1-30",
+          "lectureId": "ip-l3",
           "type": "order",
           "difficulty": "hard",
           "prompt": "رتّب هذه الاستراتيجيات حسب المنطق الذي تربط به المحاضرة بين مستوى المخاطرة والأفق الزمني، من الأقل مخاطرة (الأجل الأقصر) إلى الأعلى مخاطرة (الأجل الأطول).",
@@ -883,6 +913,7 @@
         },
         {
           "id": "ip-q1-31",
+          "lectureId": "ip-l3",
           "type": "open",
           "difficulty": "hard",
           "kind": "سيناريو",

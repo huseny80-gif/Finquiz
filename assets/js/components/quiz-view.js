@@ -14,12 +14,27 @@
     return {
       quiz: quiz,
       difficulty: 'all',
+      lecture: 'all',
       questions: quiz.questions.slice(),
       index: 0,
       responses: {},
       checked: {},
       finished: false
     };
+  }
+
+  /** الأسئلة بعد تطبيق فلترَي الصعوبة والمحاضرة معاً. */
+  function applyFilters(questions, difficulty, lecture) {
+    return DLP.quiz.filterByLecture(DLP.quiz.filterByDifficulty(questions, difficulty), lecture);
+  }
+
+  /** قائمة المحاضرات الفعلية الممثَّلة في بنك أسئلة الاختبار (بترتيب رقم المحاضرة). */
+  function lecturesInQuiz(quiz, subject) {
+    var ids = {};
+    quiz.questions.forEach(function (q) { if (q.lectureId) { ids[q.lectureId] = true; } });
+    var lectures = (subject.lectures || []).filter(function (l) { return ids[l.id]; });
+    lectures.sort(function (a, b) { return (a.number || 0) - (b.number || 0); });
+    return lectures;
   }
 
   /* ---------- حفظ التقدّم في المتصفح (محلي للجهاز، لا يُرسل لأي خادم) ---------- */
@@ -39,6 +54,7 @@
       global.localStorage.setItem(STORE_PREFIX + state.quiz.id, JSON.stringify({
         v: 1,
         difficulty: state.difficulty,
+        lecture: state.lecture,
         index: state.index,
         responses: state.responses,
         checked: state.checked,
@@ -64,7 +80,8 @@
         });
       });
       state.difficulty = saved.difficulty || 'all';
-      state.questions = DLP.quiz.filterByDifficulty(quiz.questions, state.difficulty);
+      state.lecture = saved.lecture || 'all';
+      state.questions = applyFilters(quiz.questions, state.difficulty, state.lecture);
       state.index = Math.min(Math.max(0, saved.index || 0), Math.max(0, state.questions.length - 1));
       state.finished = !!saved.finished;
     } catch (e) { return createState(quiz); }
@@ -291,7 +308,23 @@
       '<button class="btn btn-ghost btn-sm" type="button" data-quiz-action="retry">↻ ' + esc(t('quiz.retry')) + '</button>';
   }
 
-  function renderQuiz(quiz) {
+  function renderLectureFilter(state, quiz, subject) {
+    var lectures = lecturesInQuiz(quiz, subject);
+    if (lectures.length < 2) { return ''; }
+    var options = [{ key: 'all', label: t('quiz.all') }].concat(lectures.map(function (lecture) {
+      return { key: lecture.id, label: t('lecture.number') + ' ' + lecture.number, title: lecture.title };
+    }));
+    return '<div class="quiz-toolbar">' +
+      '<span class="label">' + esc(t('quiz.filterLecture')) + ':</span>' +
+      options.map(function (option) {
+        return '<button class="filter-btn" type="button" data-quiz-lecture-filter="' + esc(option.key) + '"' +
+          (option.title ? ' title="' + esc(option.title) + '"' : '') +
+          ' aria-pressed="' + (state.lecture === option.key ? 'true' : 'false') + '">' + esc(option.label) + '</button>';
+      }).join('') +
+    '</div>';
+  }
+
+  function renderQuiz(quiz, subject) {
     var state = getState(quiz);
     var levels = [
       { key: 'all', label: t('quiz.all') },
@@ -305,13 +338,14 @@
           '<h3>' + esc(quiz.title) + '</h3>' +
           (quiz.description ? '<p>' + esc(quiz.description) + '</p>' : '') +
         '</div>' +
+        '<div data-quiz-lecture-toolbar>' + renderLectureFilter(state, quiz, subject) + '</div>' +
         '<div class="quiz-toolbar">' +
           '<span class="label">' + esc(t('quiz.filter')) + ':</span>' +
           levels.map(function (level) {
             return '<button class="filter-btn" type="button" data-quiz-filter="' + esc(level.key) + '"' +
               ' aria-pressed="' + (state.difficulty === level.key ? 'true' : 'false') + '">' + esc(level.label) + '</button>';
           }).join('') +
-          '<span class="label" style="margin-inline-start:auto">' + esc(t('quiz.questionsCount')) + ': ' +
+          '<span class="label" style="margin-inline-start:auto" data-quiz-count>' + esc(t('quiz.questionsCount')) + ': ' +
             state.questions.length + '</span>' +
           '<button class="filter-btn" type="button" data-quiz-action="clear" ' +
             'title="' + esc(t('quiz.saved')) + '">🗑️ ' + esc(t('quiz.clearProgress')) + '</button>' +
@@ -329,7 +363,7 @@
       return '<div class="empty-state"><div class="big" aria-hidden="true">❓</div><p>' +
         esc(t('common.empty')) + '</p></div>';
     }
-    return quizzes.map(renderQuiz).join('');
+    return quizzes.map(function (quiz) { return renderQuiz(quiz, subject); }).join('');
   }
 
   /* ------------------------- التفاعل ------------------------- */
@@ -339,10 +373,13 @@
     root.querySelector('[data-quiz-body]').innerHTML = renderQuestion(state);
     root.querySelector('[data-quiz-foot]').innerHTML = renderFoot(state);
     root.querySelector('[data-quiz-result]').innerHTML = renderResult(state);
-    var counter = root.querySelector('.quiz-toolbar .label:last-of-type');
+    var counter = root.querySelector('[data-quiz-count]');
     if (counter) { counter.textContent = t('quiz.questionsCount') + ': ' + state.questions.length; }
     Array.prototype.forEach.call(root.querySelectorAll('[data-quiz-filter]'), function (button) {
       button.setAttribute('aria-pressed', button.dataset.quizFilter === state.difficulty ? 'true' : 'false');
+    });
+    Array.prototype.forEach.call(root.querySelectorAll('[data-quiz-lecture-filter]'), function (button) {
+      button.setAttribute('aria-pressed', button.dataset.quizLectureFilter === state.lecture ? 'true' : 'false');
     });
   }
 
@@ -359,7 +396,7 @@
     if (!panel) { return; }
 
     panel.addEventListener('click', function (event) {
-      var target = event.target.closest('[data-quiz-action],[data-quiz-filter],[data-answer]');
+      var target = event.target.closest('[data-quiz-action],[data-quiz-filter],[data-quiz-lecture-filter],[data-answer]');
       if (!target) { return; }
       var context = stateFromEvent(subject, target);
       if (!context) { return; }
@@ -368,7 +405,17 @@
 
       if (target.hasAttribute('data-quiz-filter')) {
         state.difficulty = target.dataset.quizFilter;
-        state.questions = DLP.quiz.filterByDifficulty(context.quiz.questions, state.difficulty);
+        state.questions = applyFilters(context.quiz.questions, state.difficulty, state.lecture);
+        state.index = 0;
+        state.finished = false;
+        save(state);
+        refresh(context.root, state);
+        return;
+      }
+
+      if (target.hasAttribute('data-quiz-lecture-filter')) {
+        state.lecture = target.dataset.quizLectureFilter;
+        state.questions = applyFilters(context.quiz.questions, state.difficulty, state.lecture);
         state.index = 0;
         state.finished = false;
         save(state);
@@ -385,10 +432,12 @@
         var wiped = false;
         if (action === 'retry' || action === 'clear') {
           var difficulty = action === 'clear' ? 'all' : state.difficulty;
+          var lecture = action === 'clear' ? 'all' : state.lecture;
           clearSaved(context.quiz.id);
           states[context.quiz.id] = createState(context.quiz);
           states[context.quiz.id].difficulty = difficulty;
-          states[context.quiz.id].questions = DLP.quiz.filterByDifficulty(context.quiz.questions, difficulty);
+          states[context.quiz.id].lecture = lecture;
+          states[context.quiz.id].questions = applyFilters(context.quiz.questions, difficulty, lecture);
           state = states[context.quiz.id];
           wiped = true;   // لا نُعيد الكتابة فوراً: التخزين يبقى نظيفاً حتى إجابة جديدة
         }
