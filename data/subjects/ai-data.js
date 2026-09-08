@@ -367,6 +367,7 @@
       "questions": [
         {
           "id": "ai-q1-1",
+          "lectureId": "ai-l1",
           "type": "mcq",
           "difficulty": "medium",
           "prompt": "النموذج اللغوي الكبير (LLM) يعمل بشكل أساسي عن طريق:",
@@ -381,6 +382,7 @@
         },
         {
           "id": "ai-q1-2",
+          "lectureId": "ai-l1",
           "type": "mcq",
           "difficulty": "medium",
           "prompt": "«الهلوسة» (Hallucination) في الذكاء الاصطناعي تعني:",
@@ -395,6 +397,7 @@
         },
         {
           "id": "ai-q1-3",
+          "lectureId": "ai-l2",
           "type": "mcq",
           "difficulty": "medium",
           "prompt": "أي أداة من أدوات كلود الأنسب لتنظيم ملفاتك وجدولة مهام تتكرر يوميًا تلقائيًا؟",
@@ -409,6 +412,7 @@
         },
         {
           "id": "ai-q1-4",
+          "lectureId": "ai-l1",
           "type": "mcq",
           "difficulty": "medium",
           "prompt": "حسب «القواعد الذهبية الأربع» لكتابة أمر ناجح، أول خطوة هي:",
@@ -423,6 +427,7 @@
         },
         {
           "id": "ai-q1-5",
+          "lectureId": "ai-l1",
           "type": "mcq",
           "difficulty": "medium",
           "prompt": "أي نموذج من نماذج كلود هو «الافتراضي» المتوازن لمعظم المهام اليومية؟",
@@ -437,6 +442,7 @@
         },
         {
           "id": "ai-q1-6",
+          "lectureId": "ai-l2",
           "type": "mcq",
           "difficulty": "medium",
           "prompt": "مهمة في Cowork حالتها «تحتاج ردك» (Needs input) تعني:",
@@ -451,6 +457,7 @@
         },
         {
           "id": "ai-q1-7",
+          "lectureId": "ai-l2",
           "type": "mcq",
           "difficulty": "medium",
           "prompt": "إعداد «طلب أجهزة موثوقة» (Require trusted devices) وظيفته:",
@@ -465,6 +472,7 @@
         },
         {
           "id": "ai-q1-8",
+          "lectureId": "ai-l2",
           "type": "mcq",
           "difficulty": "medium",
           "prompt": "رابط تصدير البيانات (Export data) يصلك:",
@@ -479,6 +487,7 @@
         },
         {
           "id": "ai-q1-9",
+          "lectureId": "ai-l2",
           "type": "mcq",
           "difficulty": "medium",
           "prompt": "أي خيار في «المهارات» هو الأنسب لموظف مبتدئ يريد بناء مهارة أول مرة؟",
@@ -493,6 +502,7 @@
         },
         {
           "id": "ai-q1-10",
+          "lectureId": "ai-l2",
           "type": "mcq",
           "difficulty": "medium",
           "prompt": "«إعادة الشحن التلقائي» (Auto-reload) في الفوترة تعني:",
@@ -507,6 +517,7 @@
         },
         {
           "id": "ai-q1-11",
+          "lectureId": "ai-l1",
           "type": "tf",
           "difficulty": "medium",
           "prompt": "النموذج اللغوي الكبير «يفكّر» بنفس طريقة تفكير الإنسان.",
@@ -515,6 +526,7 @@
         },
         {
           "id": "ai-q1-12",
+          "lectureId": "ai-l1",
           "type": "tf",
           "difficulty": "medium",
           "prompt": "يجب دائمًا التحقق من المعلومات الحساسة التي يقدّمها الذكاء الاصطناعي من مصدر موثوق.",
@@ -523,6 +535,7 @@
         },
         {
           "id": "ai-q1-13",
+          "lectureId": "ai-l1",
           "type": "tf",
           "difficulty": "medium",
           "prompt": "«التفكير الممتد» يُفضَّل تفعيله لكل سؤال لأنه لا يُكلّف شيئًا إضافيًا.",
@@ -531,6 +544,7 @@
         },
         {
           "id": "ai-q1-14",
+          "lectureId": "ai-l1",
           "type": "tf",
           "difficulty": "medium",
           "prompt": "نافذة السياق الكبيرة تعني أن كلود يتذكّر كل شيء للأبد حتى بعد إغلاق المحادثة.",
@@ -539,6 +553,7 @@
         },
         {
           "id": "ai-q1-15",
+          "lectureId": "ai-l2",
           "type": "tf",
           "difficulty": "medium",
           "prompt": "الإرسال إلى وكلاء فرعيين (Dispatch) يساعد على إبقاء المحادثة الأساسية مركّزة.",
@@ -547,6 +562,7 @@
         },
         {
           "id": "ai-q1-16",
+          "lectureId": "ai-l2",
           "type": "tf",
           "difficulty": "medium",
           "prompt": "«ديسباتش» و«كوورك» واجهتان مستقلتان في الشريط الجانبي.",
@@ -555,6 +571,7 @@
         },
         {
           "id": "ai-q1-17",
+          "lectureId": "ai-l2",
           "type": "tf",
           "difficulty": "medium",
           "prompt": "المهمة المؤرشفة تُحذف نهائيًا ولا يمكن استرجاعها.",
@@ -563,6 +580,7 @@
         },
         {
           "id": "ai-q1-18",
+          "lectureId": "ai-l2",
           "type": "tf",
           "difficulty": "medium",
           "prompt": "تصنيف حالة الجلسة تلقائيًا يُحسب من رصيد استخدام خطتك.",
@@ -571,6 +589,7 @@
         },
         {
           "id": "ai-q1-19",
+          "lectureId": "ai-l2",
           "type": "tf",
           "difficulty": "medium",
           "prompt": "مراجعة الجلسات النشطة إجراء أمني ينبغي تكراره دوريًا.",
@@ -579,6 +598,7 @@
         },
         {
           "id": "ai-q1-20",
+          "lectureId": "ai-l2",
           "type": "tf",
           "difficulty": "medium",
           "prompt": "تفعيل إعدادات الخصوصية يبيح رفع البيانات السرّية للدائرة.",
@@ -587,6 +607,7 @@
         },
         {
           "id": "ai-q1-21",
+          "lectureId": "ai-l1",
           "type": "open",
           "difficulty": "hard",
           "kind": "سيناريو",
@@ -659,6 +680,7 @@
         },
         {
           "id": "ai-q1-22",
+          "lectureId": "ai-l1",
           "type": "open",
           "difficulty": "hard",
           "kind": "سيناريو",
@@ -716,6 +738,7 @@
         },
         {
           "id": "ai-q1-23",
+          "lectureId": "ai-l1",
           "type": "open",
           "difficulty": "hard",
           "kind": "سيناريو",
@@ -773,6 +796,7 @@
         },
         {
           "id": "ai-q1-24",
+          "lectureId": "ai-l2",
           "type": "open",
           "difficulty": "hard",
           "kind": "سيناريو",
@@ -830,6 +854,7 @@
         },
         {
           "id": "ai-q1-25",
+          "lectureId": "ai-l2",
           "type": "open",
           "difficulty": "hard",
           "kind": "سيناريو",
@@ -893,6 +918,7 @@
         },
         {
           "id": "ai-q1-26",
+          "lectureId": "ai-l2",
           "type": "open",
           "difficulty": "hard",
           "kind": "سيناريو",
@@ -947,6 +973,7 @@
         },
         {
           "id": "ai-q1-27",
+          "lectureId": "ai-l1",
           "type": "open",
           "difficulty": "hard",
           "kind": "مقالي",
@@ -1011,6 +1038,7 @@
         },
         {
           "id": "ai-q1-28",
+          "lectureId": "ai-l2",
           "type": "open",
           "difficulty": "hard",
           "kind": "مقالي",
@@ -1077,6 +1105,7 @@
         },
         {
           "id": "ai-q1-29",
+          "lectureId": "ai-l2",
           "type": "open",
           "difficulty": "hard",
           "kind": "مقالي",
