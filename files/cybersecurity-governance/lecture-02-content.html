@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="theme-color" content="#123B4A">
+<title>المحاضرة الثانية — إطار NIST CSF 2.0 ووظيفة الحوكمة (Govern)</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Cairo:wght@700;800;900&family=Tajawal:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+:root{--navy:#123B4A;--navy2:#0C2A36;--gold:#B8891B;--gold2:#D4A72C;--ivory:#F7F4EC;--paper:#FFFFFF;--line:#D9D2C3;--muted:#5C6B70;--ink:#10222B;}
+*{box-sizing:border-box}
+body{margin:0;background:var(--ivory);color:var(--ink);font-family:'Tajawal',-apple-system,'Segoe UI',Tahoma,sans-serif;line-height:1.9;font-size:16.5px}
+h1,h2,h3{font-family:'Cairo',sans-serif;color:var(--navy);margin:0 0 10px}
+.wrap{max-width:840px;margin:0 auto;padding:26px 20px 70px}
+.hero{background:linear-gradient(135deg,var(--navy),var(--navy2));color:#EFEBDD;border-radius:12px;padding:22px 24px;margin-bottom:22px;border-inline-start:6px solid var(--gold)}
+.hero h1{color:#fff;font-size:1.4rem}
+.hero .sub{color:#C7D3D5;font-size:.92rem;margin-top:6px}
+.hero .attrib{margin-top:14px;font-size:.85rem;color:var(--gold2);font-weight:700}
+.section{background:var(--paper);border:1px solid var(--line);border-radius:12px;padding:20px 22px;margin-bottom:16px;box-shadow:0 1px 2px rgba(16,34,43,.05)}
+.section h2{font-size:1.08rem;border-inline-start:4px solid var(--gold);padding-inline-start:10px;margin-bottom:12px}
+.section p{margin:0 0 12px}
+.section b{color:var(--navy)}
+.hp-cmp-wrap{overflow-x:auto;margin:12px 0}
+table.hp-cmp{width:100%;border-collapse:collapse;font-size:.9rem}
+table.hp-cmp th,table.hp-cmp td{border:1px solid var(--line);padding:8px 10px;text-align:start}
+table.hp-cmp th{background:var(--navy);color:#fff;font-family:'Cairo',sans-serif}
+table.hp-cmp tr:nth-child(even) td{background:var(--ivory)}
+.terms{display:grid;gap:10px}
+.term{background:var(--ivory);border:1px solid var(--line);border-radius:8px;padding:12px 14px}
+.term b{color:var(--navy)}
+.timeline{display:grid;gap:8px}
+.timeline .step{background:var(--ivory);border-inline-start:4px solid var(--gold);border-radius:8px;padding:10px 14px}
+.func-grid{display:grid;gap:10px}
+.func-grid .fn{background:var(--ivory);border-inline-start:4px solid var(--navy);border-radius:8px;padding:10px 14px}
+.func-grid .fn b{color:var(--navy)}
+</style>
+</head>
+<body>
+<div id="dlp-return-bar" style="position:sticky;top:0;z-index:9999;background:#0C2A36;color:#F2EFE6;padding:10px 16px;display:flex;flex-wrap:wrap;gap:10px;align-items:center;justify-content:space-between;font-family:'Tajawal',-apple-system,'Segoe UI',Tahoma,sans-serif;border-bottom:3px solid #B8891B">
+<span style="font-size:.86rem;color:#C9D4D6">المحاضرة الثانية — حوكمة الأمن السيبراني</span>
+<span style="display:flex;gap:8px">
+<a href="../../index.html#/subject/cybersecurity-governance/lectures" style="background:#B8891B;color:#22180A;text-decoration:none;padding:7px 14px;border-radius:8px;font-weight:800;font-size:.84rem">→ العودة إلى المحاضرات</a>
+<a href="../../index.html#/" style="background:rgba(255,255,255,.1);color:#fff;text-decoration:none;padding:7px 14px;border-radius:8px;font-weight:800;font-size:.84rem;border:1px solid rgba(255,255,255,.25)">⌂ الرئيسية</a>
+</span>
+</div>
+<div class="wrap">
+  <div class="hero">
+    <h1>إطار NIST CSF 2.0 للأمن السيبراني ووظيفة الحوكمة (Govern)</h1>
+    <div class="sub">محاضرة الأسبوع الثالث</div>
+    <div class="attrib">إعداد وتقديم: أ.د. ضياء جاسم كاظم</div>
+  </div>
+
+  <div class="section"><h2>عن هذه المحاضرة</h2><p>تتناول هذه المحاضرة إطار الأمن السيبراني الصادر عن المعهد الوطني الأمريكي للمعايير والتقنية (NIST CSF)، نشأته التاريخية وتطوره حتى النسخة 2.0، ثم تتعمّق في وظيفة الحوكمة (Govern) المستحدثة وفئاتها الست التفصيلية، وصولاً إلى أدوات التطبيق والقياس العملية.</p></div>
+
+  <div class="section"><h2>الأهداف التعليمية</h2><p>بنهاية هذه المحاضرة سيكون الطالب قادراً على:</p><ul>
+    <li>فهم الجذور التاريخية والطبيعة التنظيمية لمعهد NIST وتطور إطار CSF عبر إصداراته الثلاثة.</li>
+    <li>شرح المستجدات الجوهرية في CSF 2.0، وأبرزها شمولية النطاق واستحداث وظيفة الحوكمة.</li>
+    <li>تعداد الوظائف الست الأساسية للإطار وموقع كل منها في دورة الأمن السيبراني.</li>
+    <li>تحليل الفئات الست التفصيلية لوظيفة الحوكمة (GV Categories).</li>
+    <li>التمييز بين مستويات تطبيق الإطار (Tiers) والملفات التعريفية (Profiles) وتحليل الفجوة.</li>
+  </ul></div>
+
+  <div class="section"><h2>المحور الأول: نشأة NIST ونشأة إطار CSF</h2>
+    <p><b>المعهد الوطني للمعايير والتقنية (NIST):</b> وكالة فيدرالية أمريكية غير تنظيمية تتبع وزارة التجارة، تُعنى بتطوير المعايير القياسية والتقنية لتعزيز الابتكار والأمن.</p>
+    <ul>
+      <li><b>معايير مرجعية طوعية:</b> لا تملك صفة القانون الملزم بذاتها، ولكنها تُعتمد كمرجع عالمي رئيسي.</li>
+      <li><b>لغة مشتركة للشركات:</b> تتيح للمؤسسات بمختلف أحجامها تقييم نضجها الأمني وربطه بأهداف العمل.</li>
+      <li><b>المرونة والتكيف:</b> صُمم الإطار ليتناسب مع قطاعات التكنولوجيا، المالية، والصحية وغيرها.</li>
+    </ul>
+    <p><b>التطور التاريخي لإطار NIST CSF:</b></p>
+    <div class="timeline">
+      <div class="step"><b>2014 — CSF 1.0:</b> النسخة الأولى، ركّزت بشكل أساسي على حماية البنية التحتية الحيوية: الطاقة، الاتصالات، الصحة.</div>
+      <div class="step"><b>2018 — CSF 1.1:</b> التحديث الأولي، أضاف مفاهيم قياس المخاطر وإدارة مخاطر سلسلة التوريد والتقييم الذاتي.</div>
+      <div class="step"><b>2024 — CSF 2.0:</b> النقلة النوعية، توسّع النطاق ليشمل جميع القطاعات، مع استحداث وظيفة الحوكمة (Govern).</div>
+    </div>
+    <p><b>المستجدات والتغيرات الجوهرية في CSF 2.0:</b></p>
+    <ul>
+      <li><b>شمولية نطاق التطبيق:</b> لم يعد الإطار حصرياً للبنى التحتية الحيوية، بل أصبح أدلة عالمية قابلة للتطبيق في المؤسسات الناشئة، الصغيرة، والشركات العالمية على حد سواء.</li>
+      <li><b>إضافة وظيفة الحوكمة (Govern):</b> إفراد الحوكمة كوظيفة مستقلة ومركزية تُوجّه الوظائف الخمس الأخرى، لضمان ارتباط الأمن السيبراني بالاستراتيجية العليا للمؤسسة.</li>
+    </ul>
+  </div>
+
+  <div class="section"><h2>المحور الثاني: الهيكلية الجديدة والوظائف الست</h2>
+    <p>البنية المفاهيمية لإطار CSF 2.0 تقوم على ست وظائف أساسية متكاملة:</p>
+    <div class="func-grid">
+      <div class="fn"><b>1. الحوكمة (Govern):</b> تحديد الاستراتيجية، أولويات المخاطر، والسياسات، والمسؤوليات التوجيهية.</div>
+      <div class="fn"><b>2. التعرّف (Identify):</b> حصر الأصول، الأجهزة، والبيانات، وفهم البيئة التشغيلية والمخاطر.</div>
+      <div class="fn"><b>3. الحماية (Protect):</b> وضع الضوابط الوقائية لضمان استمرار تقديم الخدمات الحيوية.</div>
+      <div class="fn"><b>4. الكشف (Detect):</b> تحديد وقوع الحوادث والأحداث السيبرانية الشاذة بشكل سريع ومباشر.</div>
+      <div class="fn"><b>5. الاستجابة (Respond):</b> اتخاذ الإجراءات الفورية واحتواء الحادث السيبراني والحد من أثره.</div>
+      <div class="fn"><b>6. التعافي (Recover):</b> استعادة القدرات والخدمات المتأثرة وتعزيز المرونة التنظيمية.</div>
+    </div>
+    <p><b>الحوكمة في قلب الإطار السيبراني:</b> في النسخة السابقة 1.1، كانت عناصر الحوكمة مبعثرة ضمن وظيفة التعرّف (ID.GV). أدركت NIST أن الأمن السيبراني ليس مجرد مهمة تقنية لحماية الأجهزة، بل هو مسؤولية قيادية عليا. تضع الحوكمة «شهية المخاطر» وتحدد الموارد والمسؤوليات التي تُبنى عليها باقي الوظائف الست: التعرف، الحماية، الكشف، الاستجابة، والتعافي.</p>
+  </div>
+
+  <div class="section"><h2>المحور الثالث: الفئات الست لوظيفة الحوكمة (GV Categories)</h2>
+    <p><b>GV.OC — السياق التنظيمي (Organizational Context):</b> فهم رسالة المؤسسة وأهدافها (لا يمكن وضع حماية سيبرانية فعالة دون فهم طبيعة عمل المؤسسة وأهدافها)، الالتزامات القانونية والتنظيمية (حصر القوانين واللوائح والاشتراطات التعاقدية مثل أنظمة هيئة الأمن السيبراني NCA)، توقعات أصحاب المصلحة (متطلبات العملاء والشركاء والمستثمرين فيما يتعلق بالخصوصية والسرية)، وربط القرار السيبراني بالواقع التشغيلي (ضمان أن القرارات الأمنية تساند استمرارية الأعمال ولا تُعيق الابتكار).</p>
+    <p><b>GV.RM — استراتيجية إدارة المخاطر:</b> شهية المخاطر (Risk Appetite) تحدد حدود مستويات المخاطر السيبرانية التي تقبل الإدارة العليا تحمّلها في سبيل تحقيق أهدافها المؤسسية، وتحديد سقف التحمل (Risk Tolerance)؛ خيارات الاستجابة والافتراضات تحدد الأطر العامة لمعالجة المخاطر: القبول، الحد، نقل الخطر (كالتأمين السيبراني)، أو تجنب الخطر، وتوفير الميزانيات اللازمة للتمويل.</p>
+    <p><b>GV.RR — الأدوار والمسؤوليات والصلاحيات:</b></p>
+    <div class='hp-cmp-wrap'><table class='hp-cmp'><thead><tr><th>المستوى التنظيمي</th><th>المسؤولية الجوهرية</th><th>آلية المساءلة</th></tr></thead><tbody>
+      <tr><td>مجلس الإدارة / القيادة العليا</td><td>اعتماد الاستراتيجية، إقرار شهية المخاطر، وتوفير الموارد</td><td>تقارير دورية عن حالة النضج والمخاطر العابرة</td></tr>
+      <tr><td>الرئيس التنفيذي للأمن (CISO)</td><td>تطوير وتطبيق برنامج الأمن السيبراني والإشراف التشغيلي</td><td>مؤشرات الأداء الرئيسية (KPIs) ونسبة امتثال الضوابط</td></tr>
+      <tr><td>الفرق التشغيلية والموظفون</td><td>التنفيذ اليومي للسياسات والالتزام بالتعليمات الأمنية</td><td>اختبارات التوعية والتدقيق الداخلي المستمر</td></tr>
+    </tbody></table></div>
+    <p><b>GV.PO — سياسات الأمن السيبراني التنظيمية:</b> صياغة واعتماد السياسات (إعداد سياسات مكتوبة وشاملة تعكس التوجهات الاستراتيجية والمتطلبات التنظيمية)، التواصل والتوعية الشاملة (نشر السياسات وتعميمها على جميع الموظفين والمقاولين بأسلوب واضح ومفهوم)، الإنفاذ والإلزام (وضع آليات تحقق لضمان تطبيق السياسات مع وجود جزاءات واضحة للمخالفات)، والمراجعة والتحديث الدوري (مراجعة السياسات سنوياً أو عند حدوث تغيرات تقنية وجوهرية في البيئة التشغيلية).</p>
+    <p><b>GV.OV — الرقابة والإشراف المستمر:</b> تتضمن وظيفة الرقابة (Oversight) استخدام نتائج التقييمات والتدقيق الدوري لتعديل وتحديث استراتيجية إدارة المخاطر وتوجيه القرار القيادي — مثال على مؤشرات هذه الرقابة: نسبة امتثال السياسات، إغلاق ملاحظات التدقيق، وتغطية تقييم المخاطر.</p>
+    <p><b>GV.SC — إدارة مخاطر سلسلة التوريد:</b> مع اعتماد المؤسسات على السحابة والموردين الخارجيين، أصبحت سلسلة التوريد من أكبر متجهات الهجوم (Attack Vectors). تقييم الموردين (إدراج المتطلبات الأمنية في العقود والاتفاقيات SLAs)، المراقبة المستمرة (التحقق الدوري من النضج الأمني للطرف الثالث)، وخطة الطوارئ المشتركة (ضمان التنسيق في حال تعرض المورد لخرق سيبراني).</p>
+  </div>
+
+  <div class="section"><h2>المحور الرابع: أدوات التطبيق والقياس</h2>
+    <p><b>مستويات تطبيق الإطار (Implementation Tiers):</b> أربعة مستويات لتحديد نضج إدارة المخاطر:</p>
+    <ul>
+      <li><b>المستوى 1 — جزئي (Partial):</b> الممارسات عشوائية وردود أفعال غير مدوّنة.</li>
+      <li><b>المستوى 2 — مستنير بالمخاطر (Risk Informed):</b> وجود سياسات لكن تطبيقها غير منتظم.</li>
+      <li><b>المستوى 3 — قابل للتكرار (Repeatable):</b> ممارسات موثقة ومؤسسية ومطبقة بانتظام.</li>
+      <li><b>المستوى 4 — متكيف (Adaptive):</b> الاستجابة الديناميكية والتعلم المستمر من التهديدات.</li>
+    </ul>
+    <p><b>الملفات التعريفية (Profiles) وتحليل الفجوة:</b> الملف الحالي (Current Profile) توصيف دقيق ومباشر لحالة الضوابط والممارسات الأمنية المطبقة فعلياً في الوقت الراهن داخل المؤسسة؛ الملف المستهدف (Target Profile) تحديد الأهداف والأوضاع الأمنية المطلوب الوصول إليها بناءً على شهية المخاطر ومتطلبات العمل؛ تحليل الفجوة وخطة العمل مقارنة الملفين لتحديد الفجوات (Gaps) وصياغة خطة خارطة طريق (Roadmap) ذات أولويات وميزانية تنفيذية.</p>
+    <p><b>سيناريو تطبيقي — الحوكمة في الممارسة العملية:</b></p>
+    <ol>
+      <li><b>التوجيه القيادي:</b> يقوم المجلس بوضع شهية المخاطر واعتماد الاستراتيجية والسياسات العامة للأمن السيبراني.</li>
+      <li><b>التنفيذ التشغيلي:</b> يقوم فريق CISO بتطبيق ضوابط Protect &amp; Detect استناداً للسياسات المعتمدة.</li>
+      <li><b>الرقابة والتقييم:</b> رفع تقارير الأداء ومراجعة مخاطر الموردين لتعديل الاستراتيجية وتحديثها بشكل دوري.</li>
+    </ol>
+  </div>
+
+  <div class="section"><h2>🏷️ قاموس المصطلحات</h2><div class="terms">
+    <div class="term"><b>NIST:</b> National Institute of Standards and Technology — المعهد الوطني الأمريكي للمعايير والتقنية.</div>
+    <div class="term"><b>CSF:</b> Cyber Security Framework — إطار الأمن السيبراني الصادر عن NIST.</div>
+    <div class="term"><b>Govern (الحوكمة):</b> الوظيفة السادسة المستحدثة في CSF 2.0، توجّه الوظائف الخمس الأخرى وتربط الأمن السيبراني بالاستراتيجية العليا.</div>
+    <div class="term"><b>Risk Appetite (شهية المخاطر):</b> حدود مستويات المخاطر التي تقبل الإدارة العليا تحمّلها لتحقيق أهدافها.</div>
+    <div class="term"><b>Risk Tolerance (سقف التحمل):</b> الحد الأقصى للانحراف المقبول عن شهية المخاطر المعتمدة.</div>
+    <div class="term"><b>Implementation Tiers (مستويات التطبيق):</b> أربعة مستويات (جزئي، مستنير بالمخاطر، قابل للتكرار، متكيف) لقياس نضج إدارة المخاطر.</div>
+    <div class="term"><b>Current / Target Profile (الملف الحالي/المستهدف):</b> توصيف الوضع الأمني الراهن مقابل الوضع المطلوب الوصول إليه، وأساس تحليل الفجوة.</div>
+  </div></div>
+
+  <div class="section"><h2>الخلاصة</h2><ul>
+    <li>إطار NIST CSF تطوّر عبر ثلاث نسخ رئيسية (2014، 2018، 2024)، وكانت النقلة النوعية في CSF 2.0 هي شمولية النطاق واستحداث وظيفة الحوكمة.</li>
+    <li>الوظائف الست (الحوكمة، التعرف، الحماية، الكشف، الاستجابة، التعافي) تشكّل دورة متكاملة تبدأ بالحوكمة التي توجّه البقية.</li>
+    <li>وظيفة الحوكمة تضم ست فئات فرعية: السياق التنظيمي، استراتيجية إدارة المخاطر، الأدوار والمسؤوليات، السياسات، الرقابة، وإدارة مخاطر سلسلة التوريد.</li>
+    <li>مستويات التطبيق والملفات التعريفية أدوات عملية لقياس النضج الأمني وتحويل الإطار النظري إلى خطة عمل ذات أولويات.</li>
+  </ul></div>
+
+  <div class="section"><h2>المراجع والمصادر</h2><ul>
+    <li>NIST Cybersecurity Framework (CSF) 2.0 — National Institute of Standards and Technology</li>
+  </ul></div>
+</div>
+</body>
+</html>
