@@ -43,7 +43,7 @@
         ],
         files: [
           { type: 'pdf',  label: 'ملف المحاضرة (PDF)', url: 'files/cybersecurity-governance/Cybersecurity3.pdf' },
-          { type: 'pptx', label: 'العرض التقديمي (PowerPoint)', url: null },
+          { type: 'pptx', label: 'العرض التقديمي (PowerPoint)', url: 'files/cybersecurity-governance/Cybersecurity3.pptx' },
           { type: 'link', label: 'أقسام المحاضرة الكاملة ومسرد المصطلحات (مصدر إضافي)', url: 'files/cybersecurity-governance/lecture-02-content.html' }
         ]
       },
@@ -411,10 +411,12 @@
       { id: 'cs-f4', type: 'pdf',   title: 'المحاضرة الأولى — مقدمة في الأمن السيبراني وحوكمة أمن المعلومات', date: '2026-09-02', url: 'files/cybersecurity-governance/Cybersecurity1.pdf', status: 'published' },
       { id: 'cs-f5', type: 'link',  title: 'الملخص التفاعلي للمحاضرة الأولى', date: '2026-09-02', url: 'files/cybersecurity-governance/summary-01.html', status: 'published' },
       { id: 'cs-f6', type: 'pdf',   title: 'المحاضرة الثانية — إطار NIST CSF 2.0 ووظيفة الحوكمة', date: '2026-09-08', url: 'files/cybersecurity-governance/Cybersecurity3.pdf', status: 'published' },
-      { id: 'cs-f7', type: 'link',  title: 'محتوى المحاضرة الثانية الكامل ومسرد المصطلحات', date: '2026-09-08', url: 'files/cybersecurity-governance/lecture-02-content.html', status: 'published' }
+      { id: 'cs-f7', type: 'link',  title: 'محتوى المحاضرة الثانية الكامل ومسرد المصطلحات', date: '2026-09-08', url: 'files/cybersecurity-governance/lecture-02-content.html', status: 'published' },
+      { id: 'cs-f8', type: 'pptx',  title: 'العرض التقديمي للمحاضرة الثانية (PowerPoint)', date: '2026-09-09', url: 'files/cybersecurity-governance/Cybersecurity3.pptx', status: 'published' }
     ],
 
     updates: [
+      { id: 'cs-u6', date: '2026-09-09', type: 'resource', title: 'إضافة العرض التقديمي للمحاضرة الثانية', body: 'أُضيف ملف العرض التقديمي (PowerPoint) الأصلي للمحاضرة الثانية — إطار NIST CSF 2.0 ووظيفة الحوكمة.', status: 'published' },
       { id: 'cs-u5', date: '2026-09-08', type: 'lecture', title: 'رفع المحاضرة الثانية الفعلية — إطار NIST CSF 2.0', body: 'أُضيفت المحاضرة الثانية الحقيقية (إطار NIST CSF 2.0 ووظيفة الحوكمة Govern)، مع ملخص كامل، 9 أسئلة تفاعلية جديدة، و3 تمارين.', status: 'published' },
       { id: 'cs-u4', date: '2026-09-02', type: 'resource', title: 'إضافة الملخص التفاعلي للمحاضرة الأولى', body: 'أُضيفت صفحة ملخص تفاعلية (ملخص تنفيذي + تفصيل كامل + اختبار ذاتي من ١٨ سؤالاً) للمحاضرة الأولى.', status: 'published' },
       { id: 'cs-u3', date: '2026-09-02', type: 'lecture', title: 'رفع المحاضرة الأولى الفعلية وإثراء الأسئلة', body: 'استُبدل محتوى المحاضرة الأولى بمحتوى حقيقي (مقدمة في الأمن السيبراني وحوكمة أمن المعلومات)، وأُضيفت 9 أسئلة تفاعلية جديدة و4 تمارين.', status: 'published' },
