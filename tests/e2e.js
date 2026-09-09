@@ -258,7 +258,7 @@ function group(name) { console.log('\n▶ ' + name); }
     await open(base + '#/subject/risk-management/quizzes');
     await page.click('.opt[data-value="1"]');
     await page.click('[data-quiz-action="check"]');
-    for (let i = 0; i < 5; i++) { await page.click('[data-quiz-action="next"]'); }
+    while (await page.$('[data-quiz-action="next"]')) { await page.click('[data-quiz-action="next"]'); }
     await page.click('[data-quiz-action="finish"]');
     await page.waitForSelector('.quiz-result');
     const score = await page.textContent('.score-big');
