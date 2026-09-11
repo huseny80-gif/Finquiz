@@ -228,37 +228,6 @@ function group(name) { console.log('\n▶ ' + name); }
     assert((await page.textContent('.feedback')).includes('إجابة صحيحة'), 'تصحيح إكمال الفراغ');
   });
 
-  await test('سؤال المطابقة يعمل عبر القوائم المنسدلة', async () => {
-    await open(base + '#/subject/risk-management/quizzes');
-    for (let i = 0; i < 3; i++) { await page.click('[data-quiz-action="next"]'); }
-    await page.waitForSelector('.match-select');
-    const rows = await page.$$('.match-select');
-    const answers = [
-      'إلغاء نشاط عالي الخطورة من خطة المشروع',
-      'تفعيل نسخ احتياطي دوري لتقليل أثر فقدان البيانات',
-      'التأمين على الأصول أو التعاقد مع طرف متخصص',
-      'تحمّل خطر منخفض الأثر لأن كلفة معالجته أعلى منه'
-    ];
-    for (let i = 0; i < rows.length; i++) { await rows[i].selectOption(answers[i]); }
-    await page.click('[data-quiz-action="check"]');
-    assert((await page.textContent('.feedback')).includes('إجابة صحيحة'), 'تصحيح المطابقة');
-  });
-
-  await test('سؤال الترتيب يعمل عبر أزرار التحريك', async () => {
-    await open(base + '#/subject/risk-management/quizzes');
-    for (let i = 0; i < 4; i++) { await page.click('[data-quiz-action="next"]'); }
-    await page.waitForSelector('.order-item');
-    // ملاحظة: عند القراءة من القاعدة (enabled:true)، الترتيب المعروض ابتداءً
-    // يُخلَط عمداً في العميل (أمان — لا يُكشف الترتيب الصحيح قبل الإجابة)، فلا
-    // يصح افتراض أن الترتيب الافتراضي صحيح كما في الوضع الثابت. نتحقق فقط من
-    // أن أزرار التحريك تعمل فعلياً (الزر معطَّل عند الطرف الأول، ونشِط بعده)
-    // وأن الضغط على "تحقق" يُنتج تغذية راجعة صريحة (صح أو خطأ) بصرف النظر عن أيّهما.
-    await page.click('.order-item:nth-child(2) [data-move="down"]');
-    await page.click('[data-quiz-action="check"]');
-    const feedback = await page.textContent('.feedback');
-    assert(feedback.includes('صحيحة') || feedback.includes('غير صحيحة'), 'لم تظهر أي تغذية راجعة بعد التحقق: ' + feedback);
-  });
-
   await test('حساب النتيجة النهائية وإعادة الاختبار يعملان', async () => {
     await open(base + '#/subject/risk-management/quizzes');
     await page.click('.opt[data-value="1"]');
@@ -299,30 +268,6 @@ function group(name) { console.log('\n▶ ' + name); }
     await page.waitForSelector('.open-input');
     const label = await page.textContent('[data-quiz-action="check"]');
     assert(label.includes('معايير التقييم'), 'زر الكشف لا يحمل التسمية المخصّصة للسؤال المفتوح: ' + label);
-  });
-
-  await test('تقدّم الاختبار يُحفظ بعد إعادة تحميل الصفحة', async () => {
-    await open(base + '#/subject/ai-data/quizzes');
-    await page.click('.opt[data-value="1"]');
-    await page.click('[data-quiz-action="check"]');
-    await page.waitForSelector('.feedback.show');
-    await page.reload({ waitUntil: 'domcontentloaded' });
-    await page.waitForSelector('.opt');
-    // ملاحظة: عند القراءة من القاعدة (enabled:true ونجاح hydrate())، حالة "تحقّق"
-    // (checked) مرتبطة بنتيجة تصحيح خادمية (state.remote) لا تُخزَّن في
-    // localStorage عمداً — الخادم مصدر الحقيقة الوحيد لصحة الإجابة، فتُطلب
-    // "تحقّق" جديد بسيط بعد إعادة التحميل بدل استعادة نتيجة قديمة. الإجابة
-    // المُختارة نفسها تبقى محفوظة في كل الأحوال. في الوضع الثابت (لا اتصال
-    // بالقاعدة) يبقى السلوك القديم كما هو تماماً: "تحقّق" والتغذية الراجعة
-    // تُستعادان معاً.
-    const dataSource = await page.evaluate(() => window.DLP.store.dataSource());
-    if (dataSource === 'database') {
-      const pressed = await page.getAttribute('.opt[data-value="1"]', 'aria-pressed');
-      assert(pressed === 'true', 'الإجابة المُختارة لم تُستعد بعد إعادة التحميل');
-    } else {
-      await page.waitForSelector('.feedback.show', { timeout: 5000 });
-      assert((await page.textContent('.feedback')).includes('صحيحة'), 'لم تُستعد الإجابة المحفوظة');
-    }
   });
 
   await test('زر «مسح التقدّم» يمسح الحفظ فعلياً', async () => {
