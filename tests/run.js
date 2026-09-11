@@ -1868,6 +1868,125 @@ test('admin/questions.js — collectQuestionSubmission(): match/order يطلبا
   equal(orderResult.children.rows.length, 2, 'يجب بناء صفَّي عناصر بترتيب الأسطر');
 });
 
+/* -------------------- Storage (Phase B) — رفع/حذف ملفات فعلية -------------------- */
+group('Storage (Phase B) — Bucket course-files، تنظيف الأسماء، تحقّق الرفع');
+
+test('sanitizeFileName(): يمنع path traversal (../) ومسارات مطلقة عبر استخراج الاسم الأخير فقط', () => {
+  const sbDLP = loadSupabaseLayer({});
+  equal(sbDLP.api.sanitizeFileName('../../etc/passwd'), 'passwd', 'يجب استخراج اسم الملف الأخير فقط، بلا أي جزء من المسار');
+  equal(sbDLP.api.sanitizeFileName('..\\..\\windows\\system32\\evil.exe'), 'evil.exe', 'يجب التعامل مع فواصل \\ أيضاً لا / فقط');
+  equal(sbDLP.api.sanitizeFileName('/etc/passwd'), 'passwd', 'مسار مطلق يجب أن يُختزل إلى اسم الملف فقط');
+});
+
+test('sanitizeFileName(): يزيل محارف التحكم والمسافات والمحارف الخطرة، ويقلّص الشرطات المتكرّرة', () => {
+  const sbDLP = loadSupabaseLayer({});
+  equal(sbDLP.api.sanitizeFileName('my file (final) v2.pdf'), 'my-file-final-v2.pdf', 'المسافات والأقواس يجب أن تتحوّل لشرطة واحدة لا متكرّرة');
+  equal(sbDLP.api.sanitizeFileName('a b.txt'), 'ab.txt', 'محارف التحكم يجب أن تُحذَف تماماً بلا أي أثر');
+  equal(sbDLP.api.sanitizeFileName('....pdf'), 'pdf', 'اسم يبدأ بنقاط متعددة يجب ألا يبقى بادئة نقاط بعد التنظيف');
+  equal(sbDLP.api.sanitizeFileName(''), 'file', 'اسم فارغ يجب أن يُستبدَل باسم افتراضي آمن بدل النصّ الفارغ');
+});
+
+test('buildStoragePath(): يبني مساراً بالبنية subject/category/طابع-اسم، ويستخدم resources لفئة غير معروفة', () => {
+  const sbDLP = loadSupabaseLayer({});
+  const path1 = sbDLP.api.buildStoragePath('ai-data', 'lectures', 'slides.pdf');
+  assert(/^ai-data\/lectures\/\d+-slides\.pdf$/.test(path1), 'يجب أن يطابق البنية subject/category/timestamp-name: ' + path1);
+  const path2 = sbDLP.api.buildStoragePath('ai-data', 'not-a-real-category', 'x.pdf');
+  assert(path2.indexOf('ai-data/resources/') === 0, 'فئة غير معروفة يجب أن تُعامَل كـresources افتراضياً: ' + path2);
+});
+
+test('validateFileForUpload(): يرفض نوع MIME غير مسموح ولا يعتمد على الامتداد وحده', () => {
+  const sbDLP = loadSupabaseLayer({});
+  const disallowed = sbDLP.api.validateFileForUpload({ name: 'video.mp4', type: 'video/mp4', size: 1000 });
+  assert(disallowed !== null, 'فيديو يجب أن يُرفَض — لا رفع فيديو ضخم إلى Storage (يجب استخدام external_url)');
+  const renamedExe = sbDLP.api.validateFileForUpload({ name: 'safe.pdf', type: 'application/x-msdownload', size: 1000 });
+  assert(renamedExe !== null, 'يجب الاعتماد على MIME الفعلي لا امتداد الاسم — ملف تنفيذي بامتداد .pdf مزوَّر يجب أن يُرفَض');
+  const okFile = sbDLP.api.validateFileForUpload({ name: 'ok.pdf', type: 'application/pdf', size: 1000 });
+  equal(okFile, null, 'PDF بحجم معقول يجب أن يمرّ التحقّق بلا أي رسالة خطأ');
+});
+
+test('validateFileForUpload(): يرفض الملفات الأكبر من 20MB حتى لو كان نوعها مسموحاً', () => {
+  const sbDLP = loadSupabaseLayer({});
+  const tooBig = sbDLP.api.validateFileForUpload({ name: 'huge.pdf', type: 'application/pdf', size: 25 * 1024 * 1024 });
+  assert(tooBig !== null, 'ملف 25MB يجب أن يُرفَض (الحد 20MB)');
+});
+
+test('mapFile عبر fetchAllContent(): storage_path يُحلَّل إلى رابط عام فعلي عبر getPublicUrl', async () => {
+  const seedRows = {
+    subjects: [{ id: 's1', order: 1, title: 'مادة', short_title: 'م', icon: '📘', accent: '#000', status: 'published', description: '' }],
+    lectures: [{ id: 'l1', subject_id: 's1', number: 1, title: 'محاضرة', date: '', status: 'published', demo: false, description: '', objectives: [] }],
+    summaries: [], assignments: [], quizzes: [], references: [], resources: [], updates: [],
+    files: [{ id: 'f1', subject_id: 's1', lecture_id: 'l1', summary_id: null, assignment_id: null, type: 'pdf', label: 'ملف مرفوع', storage_path: 's1/lectures/123-slides.pdf', external_url: null, public_url: null, status: 'published' }]
+  };
+  const client = fakeColumnCheckingClient(seedRows, {});
+  client.storage = {
+    from(bucket) {
+      equal(bucket, 'course-files', 'يجب استخدام اسم الـBucket الصحيح');
+      return { getPublicUrl: (path) => ({ data: { publicUrl: 'https://project.supabase.co/storage/v1/object/public/course-files/' + path } }) };
+    }
+  };
+  const sbDLP = loadSupabaseLayer({ configOverride: { enabled: true }, fakeClientLib: { createClient: () => client } });
+  const result = await sbDLP.api.fetchAllContent();
+  const url = result.data.s1.lectures[0].files[0].url;
+  equal(url, 'https://project.supabase.co/storage/v1/object/public/course-files/s1/lectures/123-slides.pdf',
+    'رابط الملف يجب أن يُبنى فعلياً عبر storage.from(bucket).getPublicUrl(storage_path)');
+});
+
+testAsync('adminUploadFile(): يرفض الملف محلياً بلا أي استدعاء شبكة لو فشل التحقّق (نوع/حجم)', async () => {
+  const sbDLP = loadSupabaseLayer({});
+  let rejected = false;
+  await sbDLP.api.adminUploadFile({ name: 'video.mp4', type: 'video/mp4', size: 1000 }, { subjectId: 's1', category: 'lectures' })
+    .catch(() => { rejected = true; });
+  assert(rejected, 'رفع فيديو يجب أن يُرفَض محلياً قبل أي محاولة اتصال');
+});
+
+testAsync('adminUploadFile(): عند نجاح الرفع، ينشئ صفّ files بـstorage_path وmime_type وsize صحيحة', async () => {
+  const seedRows = { files: [] };
+  const client = fakeAdminWriteClient(seedRows);
+  client.storage = {
+    from(bucket) {
+      return {
+        upload: (path, file, opts) => Promise.resolve({ data: { path: path }, error: null }),
+        remove: (paths) => Promise.resolve({ data: paths, error: null })
+      };
+    }
+  };
+  const sbDLP = loadSupabaseLayer({ configOverride: { enabled: true }, fakeClientLib: { createClient: () => client } });
+  const file = { name: 'my slides.pdf', type: 'application/pdf', size: 5000 };
+  const created = await sbDLP.api.adminUploadFile(file, { subjectId: 's1', category: 'lectures', lectureId: 'l1', label: 'شرائح المحاضرة' });
+  equal(created.mime_type, 'application/pdf', 'mime_type يجب أن يُحفَظ من الملف الفعلي');
+  equal(created.size, 5000, 'size يجب أن يُحفَظ من الملف الفعلي');
+  equal(created.file_name, 'my slides.pdf', 'file_name يجب أن يحفظ الاسم الأصلي كما هو (للعرض/التنزيل)');
+  assert(created.storage_path.indexOf('s1/lectures/') === 0, 'storage_path يجب أن يبدأ ببادئة المادة/الفئة الصحيحة');
+  assert(created.storage_path.indexOf(' ') === -1, 'storage_path يجب ألا يحتوي مسافات (الاسم يُنظَّف قبل البناء)');
+  equal(created.status, 'draft', 'الملفات الجديدة تبدأ draft افتراضياً حتى يراجعها المشرف صراحةً');
+});
+
+testAsync('adminDeleteFile(): يحذف كائن Storage أولاً ثم صفّ files، بنفس storage_path', async () => {
+  const seedRows = { files: [{ id: 'f1', storage_path: 's1/lectures/123-x.pdf' }] };
+  const client = fakeAdminWriteClient(seedRows);
+  const removedPaths = [];
+  client.storage = {
+    from(bucket) {
+      return { remove: (paths) => { removedPaths.push(paths); return Promise.resolve({ data: paths, error: null }); } };
+    }
+  };
+  const sbDLP = loadSupabaseLayer({ configOverride: { enabled: true }, fakeClientLib: { createClient: () => client } });
+  await sbDLP.api.adminDeleteFile({ id: 'f1', storage_path: 's1/lectures/123-x.pdf' });
+  equal(removedPaths[0][0], 's1/lectures/123-x.pdf', 'يجب استدعاء storage.remove() بنفس storage_path المخزَّن');
+  equal(seedRows.files.length, 0, 'صفّ files يجب أن يُحذَف أيضاً بعد نجاح حذف كائن Storage');
+});
+
+testAsync('adminDeleteFile(): ملف قديم بلا storage_path (رابط ثابت/خارجي) يُحذَف من الجدول فقط بلا استدعاء Storage', async () => {
+  const seedRows = { files: [{ id: 'f2', storage_path: null, public_url: 'files/ai-data/old.pdf' }] };
+  const client = fakeAdminWriteClient(seedRows);
+  let storageCalled = false;
+  client.storage = { from() { storageCalled = true; return {}; } };
+  const sbDLP = loadSupabaseLayer({ configOverride: { enabled: true }, fakeClientLib: { createClient: () => client } });
+  await sbDLP.api.adminDeleteFile({ id: 'f2', storage_path: null });
+  equal(storageCalled, false, 'ملف بلا storage_path يجب ألا يستدعي Storage إطلاقاً');
+  equal(seedRows.files.length, 0, 'صفّ files يجب أن يُحذَف رغم ذلك');
+});
+
 /* -------------------- admin/crud-page.js — مصنع صفحات CRUD عامة (Phase D) -------------------- */
 group('admin/crud-page.js — مصنع CRUD عام (lectures/summaries/assignments/...)');
 

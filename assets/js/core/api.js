@@ -28,39 +28,53 @@
   /* قراءة المحتوى العام (بلا تسجيل دخول) — تعيد نفس أشكال data/subjects/*.js */
   /* -------------------------------------------------------------------- */
 
+  var STORAGE_BUCKET = 'course-files';
+
   /** يبني كائن ملف بنفس شكل {type,label,url} الذي يستهلكه fileChip() في
    * components/subject.js — مطابق تماماً لشكل data/subjects/*.js الثابت.
-   * ملاحظة: لا Supabase Storage bucket فعلي بعد (انظر SUPABASE_MIGRATION_AUDIT.md) —
-   * كل الملفات المبذورة اليوم تحمل مساراً ثابتاً نسبياً داخل public_url (نفس قيمة
-   * url في البيانات الثابتة)؛ storage_path محجوز لمرحلة رفع فعلية لاحقة ولا يُستخدَم
-   * هنا بعد لبناء رابط (لا توجد دالة تحويله إلى رابط عام دون bucket حقيقي).
-   */
-  function mapFile(row) {
-    return { type: row.type, label: row.label, url: row.public_url || null };
+   * ترتيب أولوية الرابط: storage_path (ملف مرفوع فعلياً إلى Bucket
+   * course-files — يُحلَّل إلى رابط عام عبر getPublicUrl، استدعاء متزامن بلا
+   * شبكة فعلية لأن الـBucket عام؛ انظر توثيق القرار الأمني في
+   * supabase/migrations/010_storage_bucket_and_file_columns.sql)، ثم
+   * external_url (رابط خارجي صريح: يوتيوب/درايف/أي رابط)، ثم public_url
+   * (توافق عكسي بحت مع البذرة الثابتة الحالية — 45 صفاً مبذولاً لا تحمل
+   * storage_path ولا external_url إطلاقاً، فتبقى تعمل بلا أي تغيير). */
+  function mapFile(c, row) {
+    var url = null;
+    if (row.storage_path) {
+      var resolved = c.storage.from(STORAGE_BUCKET).getPublicUrl(row.storage_path);
+      url = (resolved && resolved.data && resolved.data.publicUrl) || null;
+    } else if (row.external_url) {
+      url = row.external_url;
+    } else if (row.public_url) {
+      url = row.public_url;
+    }
+    return { type: row.type, label: row.label, url: url };
   }
 
-  function mapLecture(row, filesByLecture) {
+  function mapLecture(c, row, filesByLecture) {
     return {
       id: row.id, number: row.number, title: row.title, date: row.date,
       status: row.status, demo: row.demo, description: row.description,
-      objectives: row.objectives || [], files: (filesByLecture[row.id] || []).map(mapFile)
+      objectives: row.objectives || [],
+      files: (filesByLecture[row.id] || []).map(function (f) { return mapFile(c, f); })
     };
   }
 
-  function mapSummary(row, filesBySummary) {
+  function mapSummary(c, row, filesBySummary) {
     return {
       id: row.id, lectureId: row.lecture_id, title: row.title, date: row.date,
       status: row.status, demo: row.demo,
       keyPoints: row.key_points || [], concepts: row.concepts || [], terms: row.terms || [],
-      files: (filesBySummary[row.id] || []).map(mapFile)
+      files: (filesBySummary[row.id] || []).map(function (f) { return mapFile(c, f); })
     };
   }
 
-  function mapAssignment(row, filesByAssignment) {
+  function mapAssignment(c, row, filesByAssignment) {
     return {
       id: row.id, title: row.title, difficulty: row.difficulty, date: row.date,
       due: row.due, status: row.status, demo: row.demo, description: row.description,
-      files: (filesByAssignment[row.id] || []).map(mapFile)
+      files: (filesByAssignment[row.id] || []).map(function (f) { return mapFile(c, f); })
     };
   }
 
@@ -182,7 +196,7 @@
 
       var quizIds = quizzes.map(function (q) { return q.id; });
       if (!quizIds.length) {
-        return assembleSubject(subjectRow, lectures, summaries, assignments,
+        return assembleSubject(c, subjectRow, lectures, summaries, assignments,
           quizzes, [], {}, {}, {}, references, resources, updates,
           filesByLecture, filesBySummary, filesByAssignment);
       }
@@ -202,7 +216,7 @@
         });
         var questionIds = questions.map(function (q) { return q.id; });
         if (!questionIds.length) {
-          return assembleSubject(subjectRow, lectures, summaries, assignments,
+          return assembleSubject(c, subjectRow, lectures, summaries, assignments,
             quizzes, questions, {}, {}, {}, references, resources, updates,
             filesByLecture, filesBySummary, filesByAssignment);
         }
@@ -227,7 +241,7 @@
           var items = unwrap(subResults[1]) || [];
           var pairsByQuestion = {};
           subResults[2].forEach(function (entry) { pairsByQuestion[entry.id] = entry.pairs; });
-          return assembleSubject(subjectRow, lectures, summaries, assignments,
+          return assembleSubject(c, subjectRow, lectures, summaries, assignments,
             quizzes, questions, groupBy(options, 'question_id'), groupBy(items, 'question_id'),
             pairsByQuestion, references, resources, updates,
             filesByLecture, filesBySummary, filesByAssignment);
@@ -236,7 +250,7 @@
     });
   }
 
-  function assembleSubject(subjectRow, lectures, summaries, assignments, quizzes,
+  function assembleSubject(c, subjectRow, lectures, summaries, assignments, quizzes,
     questions, optionsByQuestion, itemsByQuestion, pairsByQuestion, references, resources, updates,
     filesByLecture, filesBySummary, filesByAssignment) {
     var questionsByQuiz = groupBy(questions, 'quiz_id');
@@ -248,9 +262,9 @@
       id: subjectRow.id, order: subjectRow.order, title: subjectRow.title,
       shortTitle: subjectRow.short_title, icon: subjectRow.icon, accent: subjectRow.accent,
       status: subjectRow.status, description: subjectRow.description,
-      lectures: lectures.map(function (row) { return mapLecture(row, filesByLecture); }),
-      summaries: summaries.map(function (row) { return mapSummary(row, filesBySummary); }),
-      assignments: assignments.map(function (row) { return mapAssignment(row, filesByAssignment); }),
+      lectures: lectures.map(function (row) { return mapLecture(c, row, filesByLecture); }),
+      summaries: summaries.map(function (row) { return mapSummary(c, row, filesBySummary); }),
+      assignments: assignments.map(function (row) { return mapAssignment(c, row, filesByAssignment); }),
       quizzes: quizzes.map(function (quiz) {
         return {
           id: quiz.id, title: quiz.title, status: quiz.status, demo: quiz.demo,
@@ -482,6 +496,105 @@
     });
   }
 
+  /* ---------------------------------------------------------------------- */
+  /* Storage (Phase B) — رفع/حذف ملفات فعلية إلى Bucket course-files.         */
+  /* الحماية الفعلية في سياسات storage.objects (supabase/migrations/          */
+  /* 010_storage_bucket_and_file_columns.sql): الكتابة (رفع/تعديل/حذف)        */
+  /* مقصورة على admin/instructor عبر is_admin_or_instructor() على مستوى        */
+  /* القاعدة؛ التحقّقات هنا (نوع/حجم/اسم) طبقة دفاع إضافية في العميل، لا بديلاً */
+  /* عنها — الـBucket نفسه يحمل allowed_mime_types/file_size_limit مطابقين،    */
+  /* فأي محاولة تتجاوز هذا التحقّق العميل ستُرفَض من الخادم أيضاً.              */
+  /* ---------------------------------------------------------------------- */
+
+  var ALLOWED_FILE_MIME_TYPES = [
+    'application/pdf',
+    'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+    'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+    'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    'image/png', 'image/jpeg', 'image/webp', 'image/gif'
+  ];
+  var MAX_FILE_SIZE_BYTES = 20 * 1024 * 1024; // 20MB — يطابق file_size_limit على الـBucket
+  var STORAGE_CATEGORIES = ['lectures', 'summaries', 'assignments', 'resources'];
+
+  /** ينظّف اسم ملف قبل استخدامه في مسار Storage: يمنع path traversal (../،
+   * مسارات مطلقة)، محارف تحكّم، ومحارف خطرة على أنظمة ملفات/روابط. لا يُعتمَد
+   * عليه كحماية وحيدة — سياسات storage.objects وقيود الـBucket هي الحماية
+   * الفعلية — لكنه يمنع أسماء ملفات مضلِّلة أو مكسورة من الوصول لاستدعاء
+   * الرفع أصلاً بدل الاعتماد فقط على رفض الخادم البعيد. */
+  function sanitizeFileName(name) {
+    var base = String(name || '').split(/[\\/]/).pop(); // يزيل أي مسار قبل الاسم (يمنع ../)
+    var cleaned = '';
+    for (var i = 0; i < base.length; i++) {
+      var code = base.charCodeAt(i);
+      if (code >= 32 && code !== 127) { cleaned += base.charAt(i); } // يسقط محارف التحكم
+    }
+    cleaned = cleaned.replace(/[^A-Za-z0-9._-]+/g, '-'); // أي محرف آخر (بما فيه مسافات) → شرطة
+    cleaned = cleaned.replace(/^\.+/, '').replace(/-{2,}/g, '-'); // يمنع اسماً كله "." ويقلّص الشرطات المتكرّرة
+    cleaned = cleaned.slice(0, 150);
+    return cleaned || 'file';
+  }
+
+  /** يبني مسار Storage آمناً: <subject>/<category>/<طابع زمني>-<اسم منظَّف> —
+   * الطابع الزمني يمنع تعارض الأسماء (رفع ملفين بنفس الاسم لا يستبدل أحدهما
+   * الآخر صامتاً). category غير المعروفة تُعامَل كـ"resources" افتراضياً. */
+  function buildStoragePath(subjectId, category, fileName) {
+    var safeSubject = String(subjectId || '').replace(/[^a-z0-9-]/gi, '');
+    var safeCategory = STORAGE_CATEGORIES.indexOf(category) !== -1 ? category : 'resources';
+    return safeSubject + '/' + safeCategory + '/' + Date.now() + '-' + sanitizeFileName(fileName);
+  }
+
+  /** يتحقّق من نوع/حجم ملف قبل أي محاولة رفع فعلية — نفس القيود المضبوطة على
+   * الـBucket نفسه، مكرَّرة هنا لإعطاء رسالة خطأ فورية بدل انتظار رفض الخادم
+   * البعيد (تجربة استخدام أفضل، لا حماية إضافية فعلية). */
+  function validateFileForUpload(file) {
+    if (!file) { return 'لا يوجد ملف'; }
+    if (ALLOWED_FILE_MIME_TYPES.indexOf(file.type) === -1) { return 'نوع الملف غير مسموح: ' + file.type; }
+    if (file.size > MAX_FILE_SIZE_BYTES) { return 'حجم الملف يتجاوز الحد المسموح (20MB)'; }
+    return null;
+  }
+
+  /** يرفع ملفاً فعلياً إلى Storage وينشئ صفّ files مرتبطاً به. admin/instructor
+   * فقط فعلياً (RLS على storage.objects وfiles كلاهما يرفضان غير ذلك من
+   * القاعدة نفسها بصرف النظر عمّا يستدعيه العميل).
+   * options: {subjectId, lectureId, summaryId, assignmentId, category, label, type, status}. */
+  function adminUploadFile(file, options) {
+    options = options || {};
+    var validationError = validateFileForUpload(file);
+    if (validationError) { return Promise.reject(new Error(validationError)); }
+    var storagePath = buildStoragePath(options.subjectId, options.category, file.name);
+    return requireClient().then(function (c) {
+      return c.storage.from(STORAGE_BUCKET).upload(storagePath, file, { contentType: file.type, upsert: false })
+        .then(function (result) {
+          if (result.error) { throw result.error; }
+          return adminInsert('files', {
+            subject_id: options.subjectId || null, lecture_id: options.lectureId || null,
+            summary_id: options.summaryId || null, assignment_id: options.assignmentId || null,
+            name: options.label || file.name, file_name: file.name, type: options.type || file.type,
+            label: options.label || file.name, storage_path: storagePath, mime_type: file.type,
+            size: file.size, status: options.status || 'draft'
+          });
+        });
+    });
+  }
+
+  /** يحذف ملفاً: كائن Storage أولاً ثم صفّ files (بهذا الترتيب تحديداً — لو
+   * فشل حذف صفّ files بعد نجاح حذف الكائن، يبقى الصفّ يشير لملف محذوف فيظهر
+   * "قادم قريباً" بدل رابط معطَّل صامت؛ العكس قد يترك كائناً يتيماً في Storage
+   * بلا أي صفّ يشير إليه. كلا الفشلين الجزئيين ممكن نظرياً بلا معاملة واحدة
+   * تغطّي Storage وPostgres معاً — هذا الترتيب أكثر أماناً للمستخدم النهائي،
+   * لا ضماناً مطلقاً). ملفات public_url/external_url القديمة (بلا storage_path)
+   * تُحذَف من الجدول فقط، بلا أي استدعاء Storage. */
+  function adminDeleteFile(fileRow) {
+    return requireClient().then(function (c) {
+      var removeStorage = fileRow.storage_path
+        ? c.storage.from(STORAGE_BUCKET).remove([fileRow.storage_path]).then(function (result) {
+            if (result.error) { throw result.error; }
+          })
+        : Promise.resolve();
+      return removeStorage.then(function () { return adminDelete('files', fileRow.id); });
+    });
+  }
+
   DLP.api = {
     isReady: isReady,
     fetchAllContent: fetchAllContent,
@@ -503,7 +616,12 @@
     adminSetStatus: adminSetStatus,
     adminCountReferences: adminCountReferences,
     adminReorder: adminReorder,
-    adminReplaceQuestionChildren: adminReplaceQuestionChildren
+    adminReplaceQuestionChildren: adminReplaceQuestionChildren,
+    sanitizeFileName: sanitizeFileName,
+    buildStoragePath: buildStoragePath,
+    validateFileForUpload: validateFileForUpload,
+    adminUploadFile: adminUploadFile,
+    adminDeleteFile: adminDeleteFile
   };
 
   if (typeof module !== 'undefined' && module.exports) { module.exports = DLP.api; }
