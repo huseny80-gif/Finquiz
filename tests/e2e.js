@@ -69,6 +69,21 @@ function group(name) { console.log('\n▶ ' + name); }
     await page.reload({ waitUntil: 'domcontentloaded' });
   }
 
+  /** يضغط زر "تحقّق" وينتظر انتهاء التصحيح فعلياً قبل قراءة التغذية الراجعة.
+   * ضروري لأن التصحيح قد يكون خادمياً غير متزامن (RPC حقيقي حين
+   * DLP.store.dataSource()==='database' ونجحت hydrate() بحلول لحظة الاختبار) —
+   * محاولة قراءة `.feedback` مباشرة بعد الضغط قد تلتقط حالة "جارٍ التحقق..."
+   * المؤقتة بدل النتيجة الفعلية. في الوضع الثابت (تصحيح فوري) الانتظار هنا
+   * ينتهي فوراً بلا أي تأخير ملحوظ. */
+  async function check(targetPage) {
+    const p = targetPage || page;
+    await p.click('[data-quiz-action="check"]');
+    await p.waitForFunction(() => {
+      const el = document.querySelector('.feedback');
+      return el && el.classList.contains('show') && !el.textContent.includes('جارٍ التحقق');
+    }, null, { timeout: 10000 });
+  }
+
   const SUBJECTS = ['ai-data', 'legal-regulatory', 'cybersecurity-governance',
                     'innovation-project-management', 'risk-management'];
   const SECTIONS = ['lectures', 'summaries', 'assignments', 'quizzes', 'references', 'resources', 'updates'];
@@ -173,8 +188,7 @@ function group(name) { console.log('\n▶ ' + name); }
     await open(base + '#/subject/ai-data/quizzes');
     await page.waitForSelector('.opt');
     await page.click('.opt[data-value="1"]');
-    await page.click('[data-quiz-action="check"]');
-    await page.waitForSelector('.feedback.show');
+    await check();
     const feedback = await page.textContent('.feedback');
     assert(feedback.includes('صحيحة'), 'لا توجد نتيجة');
     assert(feedback.includes('التوضيح'), 'لا يوجد تفسير');
@@ -184,7 +198,7 @@ function group(name) { console.log('\n▶ ' + name); }
   await test('اختيار إجابة خاطئة يُظهر الإجابة الصحيحة', async () => {
     await open(base + '#/subject/legal-regulatory/quizzes');
     await page.click('.opt[data-value="0"]');
-    await page.click('[data-quiz-action="check"]');
+    await check();
     const feedback = await page.textContent('.feedback');
     assert(feedback.includes('غير صحيحة'), 'لم تُرصد الإجابة الخاطئة');
     assert(feedback.includes('الإجابة الصحيحة'), 'لم تُعرض الإجابة الصحيحة');
@@ -214,7 +228,7 @@ function group(name) { console.log('\n▶ ' + name); }
     await page.click('[data-quiz-action="next"]');
     await page.waitForSelector('.opt[data-value="false"]');
     await page.click('.opt[data-value="false"]');
-    await page.click('[data-quiz-action="check"]');
+    await check();
     assert((await page.textContent('.feedback')).includes('صحيحة'), 'تصحيح صح/خطأ');
   });
 
@@ -224,14 +238,14 @@ function group(name) { console.log('\n▶ ' + name); }
     await page.click('[data-quiz-action="next"]');
     await page.waitForSelector('.fill-input');
     await page.fill('.fill-input', 'الأثر');
-    await page.click('[data-quiz-action="check"]');
+    await check();
     assert((await page.textContent('.feedback')).includes('إجابة صحيحة'), 'تصحيح إكمال الفراغ');
   });
 
   await test('حساب النتيجة النهائية وإعادة الاختبار يعملان', async () => {
     await open(base + '#/subject/risk-management/quizzes');
     await page.click('.opt[data-value="1"]');
-    await page.click('[data-quiz-action="check"]');
+    await check();
     while (await page.$('[data-quiz-action="next"]')) { await page.click('[data-quiz-action="next"]'); }
     await page.click('[data-quiz-action="finish"]');
     await page.waitForSelector('.quiz-result');
@@ -254,7 +268,7 @@ function group(name) { console.log('\n▶ ' + name); }
     await page.waitForSelector('.open-input');
     assert((await page.textContent('.q-prompt')).includes('سؤال مفتوح'), 'وسم السؤال المفتوح مفقود');
     await page.fill('.open-input', 'إجابة تأملية يكتبها الدارس بأسلوبه الخاص للمراجعة الذاتية.');
-    await page.click('[data-quiz-action="check"]');
+    await check();
     const feedback = await page.textContent('.feedback');
     assert(feedback.includes('معايير الإجابة النموذجية'), 'لم تُكشف معايير التقييم');
     assert(!feedback.includes('✓') && !feedback.includes('✕'), 'لا يجوز عرض صح/خطأ آلي لسؤال مفتوح');
@@ -293,7 +307,7 @@ function group(name) { console.log('\n▶ ' + name); }
     blind.on('pageerror', (e) => errors.push(e.message));
     await blind.goto(base + '#/subject/ai-data/quizzes', { waitUntil: 'domcontentloaded' });
     await blind.click('.opt[data-value="1"]');
-    await blind.click('[data-quiz-action="check"]');
+    await check(blind);
     assert(await blind.$('.feedback.show'), 'الاختبار توقف عن العمل بلا تخزين');
     assert(!errors.length, 'أخطاء: ' + errors.join(' | '));
     await ctx.close();
