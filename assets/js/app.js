@@ -177,6 +177,12 @@
     // والمسار الحالي مرة واحدة ليعكسا البيانات الحقيقية.
     DLP.store.hydrate().then(function (changed) {
       if (!changed) { return; }
+      // حالة اختبار مخزَّنة في الذاكرة (quiz-view.js) قد تشير إلى كائنات أسئلة من
+      // البيانات الثابتة القديمة (لو كان المستخدم قد فتح اختباراً قبل نجاح hydrate) —
+      // بلا هذا التصفير تبقى تلك الكائنات القديمة (بلا pairsLeft/pairsRight مثلاً)
+      // بينما remoteMode() أصبحت true عالمياً، فينكسر رسم بعض أنواع الأسئلة بصمت.
+      // إعادة التحميل من localStorage بعد التصفير تُبقي تقدّم المستخدم (index/إجابات).
+      if (DLP.quizView && typeof DLP.quizView.resetStates === 'function') { DLP.quizView.resetStates(); }
       renderShell();
       DLP.router.navigate(global.location.hash || '#/');
     });
