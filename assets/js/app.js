@@ -179,10 +179,14 @@
       if (!changed) { return; }
       // حالة اختبار مخزَّنة في الذاكرة (quiz-view.js) قد تشير إلى كائنات أسئلة من
       // البيانات الثابتة القديمة (لو كان المستخدم قد فتح اختباراً قبل نجاح hydrate) —
-      // بلا هذا التصفير تبقى تلك الكائنات القديمة (بلا pairsLeft/pairsRight مثلاً)
+      // بلا هذا التحديث تبقى تلك الكائنات القديمة (بلا pairsLeft/pairsRight مثلاً)
       // بينما remoteMode() أصبحت true عالمياً، فينكسر رسم بعض أنواع الأسئلة بصمت.
-      // إعادة التحميل من localStorage بعد التصفير تُبقي تقدّم المستخدم (index/إجابات).
-      if (DLP.quizView && typeof DLP.quizView.resetStates === 'function') { DLP.quizView.resetStates(); }
+      // نُحدِّث كائنات الأسئلة بالمعرّف فقط (ترتيبها مضمون التطابق) بدل تصفير كل
+      // الحالة بالكامل — تصفير كامل كان يقطع الرابط بين وعد check() جارٍ فعلاً
+      // وحالته لو نجحت hydrate() في تلك اللحظة بالذات (سباق حقيقي لوحظ عبر CI).
+      if (DLP.quizView && typeof DLP.quizView.refreshAllQuestionObjects === 'function') {
+        DLP.quizView.refreshAllQuestionObjects();
+      }
       renderShell();
       DLP.router.navigate(global.location.hash || '#/');
     });

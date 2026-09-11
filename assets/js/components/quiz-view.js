@@ -304,6 +304,31 @@
 
   function resetStates() { states = {}; }
 
+  /** يُستدعى بعد نجاح hydrate() لتحديث كائنات الأسئلة المخزَّنة مسبقاً في الذاكرة
+   * بأحدث نسخة قادمة من القاعدة، بلا فقدان أي تقدّم أو تفاعل جارٍ (index/
+   * الإجابات/checked/remote قيد الانتظار) — بخلاف استبدال الحالة بالكامل الذي
+   * كان يقطع الرابط بين وعد check() الجاري وحالته إن نجحت hydrate() في تلك
+   * اللحظة بالذات (سباق حقيقي لوحظ عبر CI: سؤال بقي "جارٍ التحقق" للأبد).
+   * الاستبدال بالمعرّف آمن لأن ترتيب الأسئلة نفسه مضمون التطابق بين المصدرين
+   * (questionSeq() في api.js تُرتّب أسئلة القاعدة بنفس تسلسل الملفات الثابتة). */
+  function refreshQuestionObjects(freshQuiz) {
+    var state = states[freshQuiz.id];
+    if (!state) { return; }
+    var byId = {};
+    freshQuiz.questions.forEach(function (q) { byId[q.id] = q; });
+    state.quiz = freshQuiz;
+    state.questions = state.questions.map(function (q) { return byId[q.id] || q; });
+  }
+
+  /** تُطبَّق على كل اختبار محفوظ حالياً في الذاكرة عبر كل المواد — تُستدعى مرة
+   * واحدة من app.js بعد نجاح hydrate(). */
+  function refreshAllQuestionObjects() {
+    if (!DLP.store || typeof DLP.store.subjects !== 'function') { return; }
+    DLP.store.subjects().forEach(function (subject) {
+      (subject.quizzes || []).forEach(refreshQuestionObjects);
+    });
+  }
+
   function current(state) { return state.questions[state.index]; }
 
   /* ------------------------- رسم أنواع الأسئلة ------------------------- */
@@ -771,6 +796,7 @@
   DLP.quizView = {
     renderSection: renderSection, renderQuiz: renderQuiz, bind: bind,
     resetStates: resetStates, clearSaved: clearSaved,
+    refreshAllQuestionObjects: refreshAllQuestionObjects,
     /** للاختبارات فقط — لا يُستخدم من أي مكوّن آخر. */
     __test: {
       canPersist: canPersist, toServerResponse: toServerResponse, discardAttempt: discardAttempt,
@@ -778,7 +804,7 @@
       remoteMode: remoteMode, checkRemote: checkRemote, gradedFor: gradedFor,
       correctAnswerFromRevealed: correctAnswerFromRevealed, remoteScore: remoteScore,
       hasResponse: hasResponse, scoreFor: scoreFor, createState: createState,
-      getState: getState, refresh: refresh
+      getState: getState, refresh: refresh, refreshQuestionObjects: refreshQuestionObjects
     }
   };
 })(typeof window !== 'undefined' ? window : globalThis);

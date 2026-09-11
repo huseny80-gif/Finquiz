@@ -1328,6 +1328,38 @@ test('load()/getState(): تستعيد checked كالمعتاد في الوضع �
   equal(state.checked['sq1-1'], true, 'checked يجب أن تُستعاد في الوضع الثابت كما كان دائماً');
 });
 
+test('refreshQuestionObjects(): يحدّث كائنات الأسئلة بلا فقدان أي تقدّم أو تحقّق جارٍ', () => {
+  // اكتُشف عبر CI حقيقي: استبدال الحالة بالكامل عند نجاح hydrate() كان يقطع
+  // الرابط بين وعد checkRemote() الجاري وحالته — سؤال بقي "جارٍ التحقق" للأبد.
+  // الإصلاح: تحديث كائنات الأسئلة بالمعرّف فقط، مع إبقاء نفس كائن الحالة حياً.
+  const sbDLP = loadQuizViewLayer({
+    fakeStore: fakeStoreDatabase(),
+    fakeQuiz: { filterByDifficulty: (qs) => qs, filterByLecture: (qs) => qs }
+  });
+  const oldQuestion = { id: 'q1-1', type: 'match', pairs: [{ left: 'أ', right: '1' }] }; // شكل ثابت قديم
+  const quiz = { id: 'q1', questions: [oldQuestion] };
+  const state = sbDLP.quizView.__test.getState(quiz);
+  state.index = 0;
+  state.responses['q1-1'] = ['1'];
+  state.remote['q1-1'] = { pending: true }; // تحقّق جارٍ فعلياً وقت نجاح hydrate()
+
+  const newQuestion = { id: 'q1-1', type: 'match', pairsLeft: ['أ'], pairsRight: ['1'] }; // شكل القاعدة الجديد
+  const freshQuiz = { id: 'q1', questions: [newQuestion] };
+  sbDLP.quizView.__test.refreshQuestionObjects(freshQuiz);
+
+  equal(state.questions[0], newQuestion, 'يجب استبدال كائن السؤال بالنسخة الجديدة القادمة من القاعدة');
+  equal(state.index, 0, 'index يجب ألا يتأثر');
+  equal(JSON.stringify(state.responses['q1-1']), '["1"]', 'الإجابة المُختارة يجب ألا تُفقد');
+  equal(state.remote['q1-1'].pending, true, 'حالة "جارٍ التحقق" يجب أن تبقى حيّة على نفس كائن الحالة — لا تُستبدل');
+});
+
+test('refreshQuestionObjects(): لا تفعل شيئاً لاختبار لم يُفتح بعد (لا يوجد كائن حالة له)', () => {
+  const sbDLP = loadQuizViewLayer({ fakeStore: fakeStoreDatabase() });
+  // لا استدعاء لـ getState() هنا إطلاقاً — لا يوجد كائن حالة مخزَّن بعد
+  sbDLP.quizView.__test.refreshQuestionObjects({ id: 'never-opened', questions: [] });
+  assert(true, 'يجب ألا ترمي استثناءً حتى بلا حالة مخزَّنة');
+});
+
 test('scoreFor(): تُوجِّه للدالة الصحيحة بحسب dataSource (remoteScore مقابل DLP.quiz.score)', () => {
   const remoteDLP = loadQuizViewLayer({ fakeStore: fakeStoreDatabase() });
   const staticDLP = loadQuizViewLayer({
