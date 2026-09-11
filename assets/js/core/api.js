@@ -52,13 +52,30 @@
     };
   }
 
-  /** بناء سؤال واحد من صفّه + جداوله الفرعية (options/pairs/items) إن وُجدت.
+  /** خلط بسيط لمصفوفة (Fisher-Yates) — تُستخدم لتقديم عناصر order بترتيب لا يطابق
+   * بالضرورة ترتيب التخزين الفعلي، حتى لا يكشف ترتيب الصفوف الفعلي (position مخفي
+   * عن anon/authenticated لكن ترتيب إرجاع الصفوف نفسه قد يطابقه صدفة بلا هذا الخلط). */
+  function shuffle(arr) {
+    var a = arr.slice();
+    for (var i = a.length - 1; i > 0; i--) {
+      var j = Math.floor(Math.random() * (i + 1));
+      var tmp = a[i]; a[i] = a[j]; a[j] = tmp;
+    }
+    return a;
+  }
+
+  /** بناء سؤال واحد من صفّه + جداوله الفرعية (options/items/pairs) إن وُجدت.
    * ملاحظة أمنية: answer/rubric/explanation لا تصل هنا أبداً لمستخدم anon/authenticated
    * عادي — الأعمدة نفسها محجوبة على مستوى القاعدة (002_rls.sql). هذه الدالة تبني
    * تمثيلاً "للعرض قبل الإجابة" فقط؛ التصحيح الفعلي والشرح يأتيان لاحقاً عبر
-   * reveal_question_answer/save_quiz_answer بعد إجابة الطالب (Stage 2).
+   * reveal_question_answer/save_quiz_answer/check_answer بعد إجابة الطالب.
+   * ملاحظة على match: pairsLeft/pairsRight (لا pairs) عمداً — لا ترابط بينهما في
+   * هذا الشكل (get_match_pairs يعيدهما كمصفوفتين منفصلتين تماماً، انظر
+   * supabase/migrations/007_safe_match_pairs_and_public_check.sql)، على عكس شكل
+   * data/subjects/*.js الثابت الذي يحمل pairs:[{left,right}] مترابطة لأنه غير متصل
+   * بقاعدة البيانات أصلاً. quiz-view.js يميّز بين الشكلين صراحة.
    */
-  function mapQuestion(row, optionsByQuestion, itemsByQuestion) {
+  function mapQuestion(row, optionsByQuestion, itemsByQuestion, pairsByQuestion) {
     var q = {
       id: row.id, lectureId: row.lecture_id, type: row.type,
       difficulty: row.difficulty, prompt: row.prompt, kind: row.kind
@@ -66,12 +83,13 @@
     if (row.type === 'mcq') {
       q.options = (optionsByQuestion[row.id] || []).map(function (o) { return o.label; });
     } else if (row.type === 'order') {
-      q.items = (itemsByQuestion[row.id] || []).map(function (i) { return i.item_text; });
+      // position (الترتيب الصحيح) محجوب عن anon/authenticated — لا نعتمد على ترتيب
+      // إرجاع الصفوف (غير مضمون، وقد يطابق الترتيب الصحيح صدفة)؛ نخلطها صراحةً.
+      q.items = shuffle((itemsByQuestion[row.id] || []).map(function (i) { return i.item_text; }));
     } else if (row.type === 'match') {
-      // question_pairs مقصور على admin/instructor حالياً (TODO موثّق في
-      // supabase/migrations/002_rls.sql وDATABASE_SCHEMA.md) — لا يمكن لطالب
-      // عادي قراءته بعد؛ نُبقي pairs فارغة بدل رمي خطأ يكسر بقية المادة.
-      q.pairs = [];
+      var pairs = (pairsByQuestion && pairsByQuestion[row.id]) || { left: [], right: [] };
+      q.pairsLeft = pairs.left || [];
+      q.pairsRight = pairs.right || [];
     }
     return q;
   }
@@ -136,32 +154,51 @@
       var quizIds = quizzes.map(function (q) { return q.id; });
       if (!quizIds.length) {
         return assembleSubject(subjectRow, lectures, summaries, assignments,
-          quizzes, [], {}, {}, references, resources, updates);
+          quizzes, [], {}, {}, {}, references, resources, updates);
       }
 
-      return c.from('questions').select('*').in('quiz_id', quizIds).then(function (qResult) {
+      // أعمدة questions محدَّدة صراحةً (لا select('*')): answer/rubric/explanation
+      // محجوبة عن anon/authenticated على مستوى العمود (002_rls.sql) — select('*')
+      // يفشل بـ 42501 لأنه يطلب أعمدة غير ممنوحة، لا يُرجع صفوفاً ناقصة بهدوء.
+      return c.from('questions').select('id, quiz_id, lecture_id, type, difficulty, prompt, kind, status')
+        .in('quiz_id', quizIds).then(function (qResult) {
         var questions = unwrap(qResult) || [];
         var questionIds = questions.map(function (q) { return q.id; });
         if (!questionIds.length) {
           return assembleSubject(subjectRow, lectures, summaries, assignments,
-            quizzes, questions, {}, {}, references, resources, updates);
+            quizzes, questions, {}, {}, {}, references, resources, updates);
         }
+        var matchIds = questions.filter(function (q) { return q.type === 'match'; }).map(function (q) { return q.id; });
         return Promise.all([
-          c.from('question_options').select('*').in('question_id', questionIds).order('position'),
-          c.from('question_items').select('*').in('question_id', questionIds).order('position')
+          // is_correct محجوب عن anon/authenticated — لا نطلبه؛ position ممنوح هنا (خلافاً
+          // لـquestion_items) فالترتيب بالـ.order('position') آمن وصحيح.
+          c.from('question_options').select('id, question_id, position, label').in('question_id', questionIds).order('position'),
+          // position محجوب عن anon/authenticated في question_items تحديداً (يحمل الترتيب
+          // الصحيح لسؤال order) — لا يمكن حتى طلبه ضمن select ولا الترتيب به؛ سيفشل الاستعلام
+          // بـ 42501 لو حاولنا. نجلب بلا ترتيب ونخلط العناصر لاحقاً في mapQuestion.
+          c.from('question_items').select('id, question_id, item_text').in('question_id', questionIds),
+          // question_pairs مقصور بالكامل على admin/instructor؛ العرض الآمن غير المترابط
+          // يأتي فقط عبر get_match_pairs (RPC)، سؤالاً سؤالاً.
+          Promise.all(matchIds.map(function (id) {
+            return c.rpc('get_match_pairs', { p_question_id: id }).then(unwrap).then(function (pairs) {
+              return { id: id, pairs: pairs || { left: [], right: [] } };
+            });
+          }))
         ]).then(function (subResults) {
           var options = unwrap(subResults[0]) || [];
           var items = unwrap(subResults[1]) || [];
+          var pairsByQuestion = {};
+          subResults[2].forEach(function (entry) { pairsByQuestion[entry.id] = entry.pairs; });
           return assembleSubject(subjectRow, lectures, summaries, assignments,
             quizzes, questions, groupBy(options, 'question_id'), groupBy(items, 'question_id'),
-            references, resources, updates);
+            pairsByQuestion, references, resources, updates);
         });
       });
     });
   }
 
   function assembleSubject(subjectRow, lectures, summaries, assignments, quizzes,
-    questions, optionsByQuestion, itemsByQuestion, references, resources, updates) {
+    questions, optionsByQuestion, itemsByQuestion, pairsByQuestion, references, resources, updates) {
     var questionsByQuiz = groupBy(questions, 'quiz_id');
 
     return {
@@ -176,7 +213,7 @@
           id: quiz.id, title: quiz.title, status: quiz.status, demo: quiz.demo,
           description: quiz.description,
           questions: (questionsByQuiz[quiz.id] || []).map(function (q) {
-            return mapQuestion(q, optionsByQuestion, itemsByQuestion);
+            return mapQuestion(q, optionsByQuestion, itemsByQuestion, pairsByQuestion);
           })
         };
       }),
@@ -229,6 +266,16 @@
   function finishQuizAttempt(attemptId) {
     return requireClient().then(function (c) {
       return c.rpc('finish_quiz_attempt', { p_attempt_id: attemptId }).then(unwrap);
+    });
+  }
+
+  /** تصحيح فوري بلا حفظ وبلا تسجيل دخول مطلوب (anon أو authenticated على حدٍّ سواء) —
+   * لسؤال واحد بإجابة مرسلة صراحةً؛ لا تكشف بنك الإجابات (انظر
+   * supabase/migrations/007_safe_match_pairs_and_public_check.sql). تُستخدم في
+   * quiz-view.js لتصحيح الأسئلة القادمة من القاعدة حين لا يوجد مستخدم مسجَّل. */
+  function checkAnswer(questionId, response) {
+    return requireClient().then(function (c) {
+      return c.rpc('check_answer', { p_question_id: questionId, p_response: response }).then(unwrap);
     });
   }
 
@@ -286,6 +333,7 @@
     startQuizAttempt: startQuizAttempt,
     saveQuizAnswer: saveQuizAnswer,
     finishQuizAttempt: finishQuizAttempt,
+    checkAnswer: checkAnswer,
     revealQuestionAnswer: revealQuestionAnswer,
     fetchStudentProgress: fetchStudentProgress,
     fetchMyAttempts: fetchMyAttempts,

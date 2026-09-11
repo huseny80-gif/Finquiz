@@ -651,10 +651,148 @@ testAsync('auth.signOut() لا ترمي حتى بلا عميل (لا حساب ل
   assert(true, 'اكتملت بلا استثناء');
 });
 
-test('التفعيل الفعلي (enabled) معطَّل افتراضياً — فجوة question_pairs لم تُحل بعد', () => {
+test('التفعيل الفعلي (enabled) مُفعَّل بعد حل فجوتي question_pairs وselect(*) المقيَّد', () => {
   const configDLP = loadSupabaseLayer({});
-  assert(configDLP.config.supabase.enabled === false,
-    'enabled يجب أن يبقى false حتى يُحل TODO أسئلة المطابقة في 002_rls.sql');
+  assert(configDLP.config.supabase.enabled === true,
+    'enabled يجب أن يكون true بعد 007_safe_match_pairs_and_public_check.sql وإصلاح أعمدة api.js');
+});
+
+/* -------------------- api.js: محاكي استعلامات يحاكي قيود الأعمدة الفعلية في     */
+/* PostgREST/RLS (002_rls.sql) — لضبط الأعمدة المطلوبة فعلياً في كل select() مقابل */
+/* ما هو ممنوح حقاً لـ anon/authenticated، لا افتراض "select('*') سينجح دائماً".   */
+/* هذا الاختبار هو الذي كشف أصلاً أن select('*') على questions/question_options/  */
+/* question_items كان سيفشل بـ 42501 فعلياً لو اتصل بمشروع حي — راجع تفاصيل هذا   */
+/* الاكتشاف في IMPLEMENTATION_REPORT.md. */
+
+/** الأعمدة الممنوحة فعلياً (نسخة طبق الأصل من GRANT SELECT في 002_rls.sql) —
+ * أي عمود آخر مطلوب في select() أو order() على هذه الجداول يجب أن يفشل هنا
+ * تماماً كما يفشل على المشروع الحي فعلاً (نمط "42501 permission denied"). */
+const GRANTED_COLUMNS = {
+  questions: ['id', 'quiz_id', 'lecture_id', 'type', 'difficulty', 'prompt', 'kind', 'status', 'created_at'],
+  question_options: ['id', 'question_id', 'position', 'label'],
+  question_items: ['id', 'question_id', 'item_text'] // لا position هنا — الترتيب الصحيح محجوب
+};
+
+function fakeColumnCheckingClient(seedRows, rpcs) {
+  const calls = { selects: [], orders: [], rpc: [] };
+
+  function violation(table, colsCsv) {
+    const allowed = GRANTED_COLUMNS[table];
+    if (!allowed) { return null; } // جدول بلا قيود أعمدة معروفة في هذا المحاكي (قراءة عامة كاملة)
+    const requested = colsCsv.split(',').map((s) => s.trim()).filter(Boolean);
+    const bad = requested.find((c) => c !== '*' && allowed.indexOf(c) === -1);
+    if (requested.indexOf('*') !== -1) { return 'permission denied for table ' + table + ' (select *)'; }
+    return bad ? ('permission denied for table ' + table + ' (column ' + bad + ')') : null;
+  }
+
+  function builder(table) {
+    const filters = [];
+    let orderCol = null;
+    let selectCols = '*';
+    const b = {
+      select(cols) { selectCols = cols; calls.selects.push([table, cols]); return b; },
+      eq(col, val) { filters.push([col, val]); return b; },
+      in(col, vals) { filters.push([col, vals]); return b; },
+      order(col) { orderCol = col; calls.orders.push([table, col]); return b; },
+      then(onFulfilled, onRejected) {
+        const err = violation(table, selectCols) || (orderCol ? violation(table, orderCol) : null);
+        let result;
+        if (err) {
+          result = { data: null, error: new Error(err) };
+        } else {
+          let rows = (seedRows[table] || []).filter((row) =>
+            filters.every(([col, val]) => (Array.isArray(val) ? val.indexOf(row[col]) !== -1 : row[col] === val)));
+          if (selectCols !== '*') {
+            const cols = selectCols.split(',').map((s) => s.trim());
+            rows = rows.map((row) => { const out = {}; cols.forEach((c) => { out[c] = row[c]; }); return out; });
+          }
+          if (orderCol) { rows = rows.slice().sort((a, c) => (a[orderCol] > c[orderCol] ? 1 : -1)); }
+          result = { data: rows, error: null };
+        }
+        return Promise.resolve(result).then(onFulfilled, onRejected);
+      }
+    };
+    return b;
+  }
+
+  return {
+    from: builder,
+    rpc(name, params) {
+      calls.rpc.push([name, params]);
+      const handler = rpcs[name];
+      return Promise.resolve({ data: handler ? handler(params) : null, error: null });
+    },
+    __calls: calls
+  };
+}
+
+testAsync('fetchAllContent(): لا يطلب أي عمود غير ممنوح فعلياً (كان سيفشل 42501 على مشروع حي)', async () => {
+  const seedRows = {
+    subjects: [{ id: 's1', order: 1, title: 'مادة', short_title: 'م', icon: '📘', accent: '#000', status: 'published', description: '' }],
+    lectures: [], summaries: [], assignments: [],
+    quizzes: [{ id: 'quiz1', subject_id: 's1', title: 'اختبار', status: 'published', demo: false, description: '' }],
+    references: [], resources: [], updates: [],
+    questions: [
+      { id: 'mcq1', quiz_id: 'quiz1', lecture_id: null, type: 'mcq', difficulty: 'easy', prompt: 'سؤال', kind: 'auto', status: 'published' },
+      { id: 'order1', quiz_id: 'quiz1', lecture_id: null, type: 'order', difficulty: 'easy', prompt: 'رتّب', kind: 'auto', status: 'published' },
+      { id: 'match1', quiz_id: 'quiz1', lecture_id: null, type: 'match', difficulty: 'easy', prompt: 'طابق', kind: 'auto', status: 'published' }
+    ],
+    question_options: [
+      { id: 'o1', question_id: 'mcq1', position: 0, label: 'أ' },
+      { id: 'o2', question_id: 'mcq1', position: 1, label: 'ب' }
+    ],
+    question_items: [
+      { id: 'i1', question_id: 'order1', item_text: 'الأول' },
+      { id: 'i2', question_id: 'order1', item_text: 'الثاني' }
+    ]
+  };
+  const rpcs = {
+    get_match_pairs: () => ({ left: ['يسار1', 'يسار2'], right: ['يمين2', 'يمين1'] })
+  };
+  const client = fakeColumnCheckingClient(seedRows, rpcs);
+  const sbDLP = loadSupabaseLayer({ configOverride: { enabled: true }, fakeClientLib: { createClient: () => client } });
+
+  const result = await sbDLP.api.fetchAllContent();
+  assert(result && result.data && result.data.s1, 'يجب أن ينجح fetchAllContent بالكامل بلا أي خطأ صلاحيات');
+  const quiz = result.data.s1.quizzes[0];
+  const mcq = quiz.questions.find((q) => q.id === 'mcq1');
+  const order = quiz.questions.find((q) => q.id === 'order1');
+  const match = quiz.questions.find((q) => q.id === 'match1');
+  equal(mcq.options.join(','), 'أ,ب', 'خيارات mcq يجب أن تُبنى من question_options بلا رمي');
+  assert(Array.isArray(order.items) && order.items.length === 2 && order.items.indexOf('الأول') !== -1,
+    'عناصر order يجب أن تصل كاملة (بلا اعتماد على عمود position المحجوب)');
+  equal(match.pairsLeft.join(','), 'يسار1,يسار2', 'pairsLeft تأتي من get_match_pairs لا من question_pairs مباشرة');
+  equal(match.pairsRight.join(','), 'يمين2,يمين1', 'pairsRight تأتي من get_match_pairs كما هي');
+  assert(match.pairs === undefined, 'لا يجوز أن يحمل سؤال match قادم من القاعدة شكل pairs المترابط القديم');
+  equal(client.__calls.rpc.length, 1, 'get_match_pairs يُستدعى مرة واحدة فقط لسؤال المطابقة الوحيد');
+});
+
+testAsync('fetchAllContent(): يفشل بوضوح لو طلب select(*) خطأً بدل الأعمدة الممنوحة (يثبت أن المحاكي يعمل)', async () => {
+  const seedRows = {
+    subjects: [{ id: 's1', order: 1, title: 'مادة', short_title: 'م', icon: '📘', accent: '#000', status: 'published', description: '' }],
+    lectures: [], summaries: [], assignments: [],
+    quizzes: [{ id: 'quiz1', subject_id: 's1', title: 'اختبار', status: 'published', demo: false, description: '' }],
+    references: [], resources: [], updates: [],
+    questions: [{ id: 'mcq1', quiz_id: 'quiz1', lecture_id: null, type: 'mcq', difficulty: 'easy', prompt: 'سؤال', kind: 'auto', status: 'published' }],
+    question_options: [{ id: 'o1', question_id: 'mcq1', position: 0, label: 'أ' }],
+    question_items: []
+  };
+  // محاكي بديل يطلب select('*') عمداً على question_options ليثبت أن fakeColumnCheckingClient
+  // يرفضه فعلاً (ضمان أن الاختبار السابق كان سيكشف الخطأ الحقيقي لو ظل الكود القديم قائماً).
+  const client = fakeColumnCheckingClient(seedRows, {});
+  const realFrom = client.from;
+  client.from = (table) => {
+    const b = realFrom(table);
+    if (table === 'question_options') {
+      const realSelect = b.select;
+      b.select = () => realSelect.call(b, '*');
+    }
+    return b;
+  };
+  const sbDLP = loadSupabaseLayer({ configOverride: { enabled: true }, fakeClientLib: { createClient: () => client } });
+  let rejected = false;
+  await sbDLP.api.fetchAllContent().catch(() => { rejected = true; });
+  assert(rejected, 'select(*) على جدول محجوب الأعمدة يجب أن يفشل — إن لم يفشل فالمحاكي لا يختبر شيئاً حقيقياً');
 });
 
 /* -------------------- store.hydrate() — الاستبدال الذرّي وسقوط fallback -------------------- */
@@ -662,7 +800,7 @@ test('التفعيل الفعلي (enabled) معطَّل افتراضياً — 
 /** يحمّل نسخة معزولة من core/store.js مع بيانات ثابتة لمادة واحدة فقط، ليمكن
  * حقن DLP.api وهمي والتحقّق من hydrate() بمعزل عن بقية اختبارات DLP المشتركة. */
 function loadStoreLayer() {
-  const sandbox = { console, addEventListener() {}, document: null };
+  const sandbox = { console, addEventListener() {}, document: null, setTimeout, clearTimeout };
   sandbox.window = sandbox;
   sandbox.globalThis = sandbox;
   vm.createContext(sandbox);
@@ -708,6 +846,19 @@ testAsync('hydrate() تسقط بهدوء على البيانات الثابتة 
   equal(sbDLP.store.subjects().map((s) => s.id).join(','), before.join(','), 'البيانات تغيّرت رغم فشل الجلب!');
 });
 
+testAsync('hydrate() لا تُعلّق الموقع أبداً: اتصال عالق بلا استجابة يسقط بهدوء بعد مهلة محدودة', async () => {
+  const sbDLP = loadStoreLayer();
+  const before = sbDLP.store.subjects().map((s) => s.id);
+  // وعد لا يُحسم أبداً — يحاكي اتصالاً عالقاً (لا خطأ فوري، ولا نجاح) لا تعثّراً بسيطاً
+  sbDLP.api = { isReady: () => true, fetchAllContent: () => new Promise(() => {}) };
+  const started = Date.now();
+  const changed = await sbDLP.store.hydrate();
+  const elapsedMs = Date.now() - started;
+  equal(changed, false, 'يجب أن تسقط بهدوء على البيانات الثابتة بدل الانتظار للأبد');
+  assert(elapsedMs < 10000, 'يجب أن تُحسم خلال مهلة محدودة لا أن تُعلّق تحميل الصفحة (استغرقت ' + elapsedMs + 'ms)');
+  equal(sbDLP.store.subjects().map((s) => s.id).join(','), before.join(','), 'البيانات تغيّرت رغم عدم اكتمال الاتصال!');
+});
+
 testAsync('hydrate() تسقط بهدوء إن أعادت fetchAllContent() شكلاً ناقصاً', async () => {
   const sbDLP = loadStoreLayer();
   const before = sbDLP.store.subjects().map((s) => s.id);
@@ -724,12 +875,30 @@ group('quiz-view — الحفظ الدائم لمستخدم مسجَّل (بلا
  * يُحقنان قبل تنفيذ الملف (كما يحدث فعلياً عند تحميل السكربتات بترتيبها في
  * index.html). لا DOM هنا؛ الاختبارات تقتصر على منطق الحفظ (__test) الذي لا
  * يلمس document إطلاقاً — رسم الواجهة وربط الأحداث مغطّيان بالفعل بـ tests/e2e.js. */
+/** i18n وهمي بسيط: يعيد نص القيمة الافتراضية بمفاتيح ثابتة معروفة لتسهيل التوقّع
+ * في الاختبارات، دون تحميل data/config/strings.js الحقيقي (غير ضروري هنا). */
+const FAKE_I18N_STRINGS = {
+  'quiz.true': 'صح', 'quiz.false': 'خطأ', 'quiz.signInToReveal': 'سجّل الدخول لرؤية الإجابة',
+  'quiz.checking': 'جارٍ التحقق...'
+};
+function fakeI18n() { return { t: (key) => (key in FAKE_I18N_STRINGS ? FAKE_I18N_STRINGS[key] : key) }; }
+function fakeUtils() {
+  return {
+    escapeHtml: (v) => String(v == null ? '' : v),
+    normalizeArabic: (v) => String(v == null ? '' : v).trim().toLowerCase()
+  };
+}
+
 function loadQuizViewLayer(options) {
   options = options || {};
   const sandbox = { console, addEventListener() {}, document: null };
   sandbox.window = sandbox;
   sandbox.globalThis = sandbox;
-  sandbox.DLP = { auth: options.fakeAuth, api: options.fakeApi };
+  sandbox.DLP = {
+    auth: options.fakeAuth, api: options.fakeApi,
+    store: options.fakeStore, quiz: options.fakeQuiz,
+    i18n: options.fakeI18n || fakeI18n(), utils: options.fakeUtils || fakeUtils()
+  };
   vm.createContext(sandbox);
   vm.runInContext(fs.readFileSync(path.join(ROOT, 'assets/js/components/quiz-view.js'), 'utf8'),
     sandbox, { filename: 'assets/js/components/quiz-view.js' });
@@ -889,6 +1058,196 @@ testAsync('discardAttempt(): يسمح ببدء محاولة خادمية جدي�
   sbDLP.quizView.__test.discardAttempt(quiz.id);
   await sbDLP.quizView.__test.persistAnswer(quiz, { id: 'ai-q1-1', type: 'mcq' }, 0);
   equal(startCount, 2, 'يجب بدء محاولة خادمية جديدة تماماً بعد discardAttempt (retry/clear)');
+});
+
+/* -------------------- quiz-view.js — تصحيح عن بُعد للمحتوى القادم من القاعدة -------------------- */
+group('quiz-view — تصحيح عن بُعد (remoteMode) عبر check_answer/save_quiz_answer/reveal_question_answer');
+
+function fakeStoreDatabase() { return { dataSource: () => 'database' }; }
+function fakeStoreStatic() { return { dataSource: () => 'static' }; }
+
+/** جذر DOM وهمي كافٍ لتنفيذ refresh() (تحديث progress/body/foot/result) بلا رمي —
+ * لا نحتاج تحقّق محتوى HTML هنا، فقط ألا ينهار الاستدعاء الداخلي لـ checkRemote(). */
+function fakeQuizRoot() {
+  const node = () => ({ innerHTML: '', textContent: '' });
+  return { querySelector: () => node(), querySelectorAll: () => [] };
+}
+
+test('remoteMode(): false حين dataSource ثابتة (static) — السلوك الافتراضي اليوم', () => {
+  const sbDLP = loadQuizViewLayer({ fakeStore: fakeStoreStatic() });
+  equal(sbDLP.quizView.__test.remoteMode(), false, 'يجب أن تبقى false في الوضع الثابت');
+});
+
+test('remoteMode(): true حين dataSource=database (بعد hydrate ناجحة)', () => {
+  const sbDLP = loadQuizViewLayer({ fakeStore: fakeStoreDatabase() });
+  equal(sbDLP.quizView.__test.remoteMode(), true, 'يجب أن تصبح true بعد نجاح hydrate()');
+});
+
+test('remoteMode(): false بلا DLP.store أصلاً (لا يرمي)', () => {
+  const sbDLP = loadQuizViewLayer({});
+  equal(sbDLP.quizView.__test.remoteMode(), false, 'غياب DLP.store يجب أن يعني static لا رمي استثناء');
+});
+
+testAsync('checkRemote(): مستخدم مسجَّل → save_quiz_answer ثم reveal_question_answer، ويُخزَّن كلاهما', async () => {
+  const calls = [];
+  const sbDLP = loadQuizViewLayer({
+    fakeStore: fakeStoreDatabase(),
+    fakeAuth: fakeAuthWithUser({ id: 'u1' }),
+    fakeApi: {
+      isReady: () => true,
+      startQuizAttempt: () => { calls.push('start'); return Promise.resolve('attempt-1'); },
+      saveQuizAnswer: (attemptId, questionId, response) => {
+        calls.push(['save', attemptId, questionId, response]); return Promise.resolve(true);
+      },
+      revealQuestionAnswer: (questionId) => {
+        calls.push(['reveal', questionId]); return Promise.resolve({ answer: 1, explanation: 'شرح' });
+      }
+    }
+  });
+  const question = { id: 'ai-q1-1', type: 'mcq', options: ['أ', 'ب'] };
+  const quiz = { id: 'ai-q1', questions: [question] };
+  const state = sbDLP.quizView.__test.createState(quiz);
+  state.responses[question.id] = 1;
+  await sbDLP.quizView.__test.checkRemote(quiz, question, state, fakeQuizRoot());
+  equal(state.checked[question.id], true, 'يجب أن يصبح السؤال محسوماً بعد نجاح RPC');
+  equal(state.remote[question.id].pending, false, 'يجب ألا يبقى معلَّقاً');
+  equal(state.remote[question.id].correct, true, 'يجب أن يعكس القيمة المُعادة من save_quiz_answer');
+  assert(state.remote[question.id].revealed && state.remote[question.id].revealed.explanation === 'شرح',
+    'يجب تخزين نتيجة reveal_question_answer لمستخدم مسجَّل');
+  equal(calls.map((c) => (Array.isArray(c) ? c[0] : c)).join(','), 'start,save,reveal',
+    'يجب استدعاء start ثم save ثم reveal بالترتيب لمستخدم مسجَّل');
+});
+
+testAsync('checkRemote(): زائر غير مسجَّل → check_answer فقط (بلا حفظ، بلا reveal)', async () => {
+  const calls = [];
+  const sbDLP = loadQuizViewLayer({
+    fakeStore: fakeStoreDatabase(),
+    fakeAuth: fakeAuthNoUser(),
+    fakeApi: {
+      isReady: () => true,
+      checkAnswer: (questionId, response) => { calls.push(['check', questionId, response]); return Promise.resolve(false); },
+      saveQuizAnswer: () => { calls.push('save'); return Promise.resolve(true); },
+      revealQuestionAnswer: () => { calls.push('reveal'); return Promise.resolve({}); }
+    }
+  });
+  const question = { id: 'ai-q1-1', type: 'mcq', options: ['أ', 'ب'] };
+  const quiz = { id: 'ai-q1', questions: [question] };
+  const state = sbDLP.quizView.__test.createState(quiz);
+  state.responses[question.id] = 0;
+  await sbDLP.quizView.__test.checkRemote(quiz, question, state, fakeQuizRoot());
+  equal(state.checked[question.id], true, 'يجب أن يُحسم السؤال حتى بلا تسجيل دخول');
+  equal(state.remote[question.id].correct, false, 'يجب أن يعكس نتيجة check_answer');
+  equal(state.remote[question.id].revealed, undefined, 'لا يجوز كشف الإجابة الكاملة لزائر غير مسجَّل');
+  equal(calls.join(','), 'check,ai-q1-1,0', 'يجب استدعاء check_answer فقط لا save_quiz_answer ولا reveal');
+});
+
+testAsync('checkRemote(): سؤال مفتوح (open) لا يستدعي check_answer/save_quiz_answer إطلاقاً', async () => {
+  let checkCalled = false;
+  const sbDLP = loadQuizViewLayer({
+    fakeStore: fakeStoreDatabase(),
+    fakeAuth: fakeAuthNoUser(),
+    fakeApi: { isReady: () => true, checkAnswer: () => { checkCalled = true; return Promise.resolve(true); } }
+  });
+  const question = { id: 'ai-q1-9', type: 'open' };
+  const quiz = { id: 'ai-q1', questions: [question] };
+  const state = sbDLP.quizView.__test.createState(quiz);
+  await sbDLP.quizView.__test.checkRemote(quiz, question, state, fakeQuizRoot());
+  equal(checkCalled, false, 'لا تصحيح آلي لسؤال مفتوح — لا يجوز استدعاء check_answer');
+  equal(state.checked[question.id], true, 'يجب أن يُحسم (يُكشف) رغم عدم وجود تصحيح آلي');
+});
+
+testAsync('checkRemote(): فشل شبكة يُبقي السؤال قابلاً لإعادة المحاولة (لا يعلق للأبد)', async () => {
+  const sbDLP = loadQuizViewLayer({
+    fakeStore: fakeStoreDatabase(),
+    fakeAuth: fakeAuthNoUser(),
+    fakeApi: { isReady: () => true, checkAnswer: () => Promise.reject(new Error('انقطاع شبكة')) }
+  });
+  const question = { id: 'ai-q1-1', type: 'mcq', options: ['أ', 'ب'] };
+  const quiz = { id: 'ai-q1', questions: [question] };
+  const state = sbDLP.quizView.__test.createState(quiz);
+  await sbDLP.quizView.__test.checkRemote(quiz, question, state, fakeQuizRoot());
+  equal(state.checked[question.id], undefined, 'لا يجوز اعتباره محسوماً عند فشل الشبكة');
+  equal(state.remote[question.id], undefined, 'يجب حذف حالة "معلّق" بعد الفشل حتى يمكن إعادة المحاولة');
+});
+
+test('gradedFor(): تُعيد null أثناء الانتظار (pending) في الوضع القادم من القاعدة', () => {
+  const sbDLP = loadQuizViewLayer({ fakeStore: fakeStoreDatabase() });
+  const state = sbDLP.quizView.__test.createState({ id: 'q1', questions: [] });
+  const question = { id: 'q1-1', type: 'mcq' };
+  state.remote[question.id] = { pending: true };
+  equal(sbDLP.quizView.__test.gradedFor(state, question), null, 'يجب أن تكون null أثناء الانتظار');
+});
+
+test('gradedFor(): تعتمد على DLP.quiz.grade في الوضع الثابت بلا أي تغيير', () => {
+  let gradeCalledWith = null;
+  const sbDLP = loadQuizViewLayer({
+    fakeStore: fakeStoreStatic(),
+    fakeQuiz: { grade: (q, r) => { gradeCalledWith = [q.id, r]; return { correct: true, correctAnswer: 'س' }; } }
+  });
+  const state = sbDLP.quizView.__test.createState({ id: 'q1', questions: [] });
+  const question = { id: 'q1-1', type: 'mcq' };
+  state.checked[question.id] = true;
+  state.responses[question.id] = 1;
+  const graded = sbDLP.quizView.__test.gradedFor(state, question);
+  equal(graded.correct, true, 'يجب أن تُعيد نتيجة DLP.quiz.grade كما هي في الوضع الثابت');
+  equal(gradeCalledWith.join(','), 'q1-1,1', 'يجب استدعاء grade بالسؤال والإجابة الصحيحين');
+});
+
+test('correctAnswerFromRevealed(): نص "سجّل الدخول" حين لا توجد بيانات مكشوفة (زائر غير مسجَّل)', () => {
+  const sbDLP = loadQuizViewLayer({ fakeStore: fakeStoreDatabase() });
+  const text = sbDLP.quizView.__test.correctAnswerFromRevealed({ type: 'mcq' }, null);
+  equal(text, 'سجّل الدخول لرؤية الإجابة', 'يجب استخدام نص i18n المخصَّص، لا كشف فارغ مضلِّل');
+});
+
+test('correctAnswerFromRevealed(): mcq تبني النص من الخيار is_correct:true فقط', () => {
+  const sbDLP = loadQuizViewLayer({ fakeStore: fakeStoreDatabase() });
+  const revealed = { options: [{ position: 0, label: 'أ', is_correct: false }, { position: 1, label: 'ب', is_correct: true }] };
+  equal(sbDLP.quizView.__test.correctAnswerFromRevealed({ type: 'mcq' }, revealed), 'ب');
+});
+
+test('correctAnswerFromRevealed(): match تبني كل الأزواج الصحيحة من pairs المكشوفة', () => {
+  const sbDLP = loadQuizViewLayer({ fakeStore: fakeStoreDatabase() });
+  const revealed = { pairs: [{ left: 'أ', right: '1' }, { left: 'ب', right: '2' }] };
+  equal(sbDLP.quizView.__test.correctAnswerFromRevealed({ type: 'match' }, revealed), 'أ ← 1 | ب ← 2');
+});
+
+test('correctAnswerFromRevealed(): order تبني الترتيب الصحيح من items المكشوفة', () => {
+  const sbDLP = loadQuizViewLayer({ fakeStore: fakeStoreDatabase() });
+  const revealed = { items: ['الأول', 'الثاني'] };
+  equal(sbDLP.quizView.__test.correctAnswerFromRevealed({ type: 'order' }, revealed), 'الأول ← الثاني');
+});
+
+test('remoteScore(): تحتسب فقط الأسئلة المحسومة فعلياً (لا إجابات لم تُتحقَّق منها بعد)', () => {
+  const sbDLP = loadQuizViewLayer({ fakeStore: fakeStoreDatabase() });
+  const quiz = {
+    id: 'q1',
+    questions: [
+      { id: 'q1-1', type: 'mcq' }, { id: 'q1-2', type: 'mcq' },
+      { id: 'q1-3', type: 'mcq' }, { id: 'q1-4', type: 'open' }
+    ]
+  };
+  const state = sbDLP.quizView.__test.createState(quiz);
+  state.remote['q1-1'] = { pending: false, correct: true };
+  state.remote['q1-2'] = { pending: false, correct: false };
+  state.remote['q1-3'] = { pending: true }; // لم يُحسم بعد — يجب ألا يُحتسب answered
+  state.remote['q1-4'] = { pending: false, correct: false }; // open — لا يُحتسب ضمن gradable
+  const score = sbDLP.quizView.__test.remoteScore(state);
+  equal(score.total, 3, 'gradable يجب أن يستثني السؤال المفتوح');
+  equal(score.gradableAnswered, 2, 'سؤالان محسومان فقط ضمن القابل للتصحيح (q1-3 معلَّق)');
+  equal(score.correct, 1, 'إجابة صحيحة واحدة فقط');
+  equal(score.answered, 3, 'answered تشمل المفتوح المحسوم + q1-1 + q1-2 (لا q1-3 المعلَّق)');
+});
+
+test('scoreFor(): تُوجِّه للدالة الصحيحة بحسب dataSource (remoteScore مقابل DLP.quiz.score)', () => {
+  const remoteDLP = loadQuizViewLayer({ fakeStore: fakeStoreDatabase() });
+  const staticDLP = loadQuizViewLayer({
+    fakeStore: fakeStoreStatic(),
+    fakeQuiz: { score: () => ({ total: 42, allTotal: 42, answered: 0, gradableAnswered: 0, correct: 0, wrong: 0, percent: 0 }) }
+  });
+  const remoteState = remoteDLP.quizView.__test.createState({ id: 'q1', questions: [] });
+  equal(remoteDLP.quizView.__test.scoreFor(remoteState).total, 0, 'remoteScore على اختبار بلا أسئلة');
+  const staticState = staticDLP.quizView.__test.createState({ id: 'q1', questions: [] });
+  equal(staticDLP.quizView.__test.scoreFor(staticState).total, 42, 'يجب استخدام DLP.quiz.score في الوضع الثابت');
 });
 
 /* -------------------- dashboard.js — لوحة الطالب (Stage 3) -------------------- */

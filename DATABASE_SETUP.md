@@ -20,6 +20,9 @@
    supabase/migrations/004_fix_mcq_grading_operator.sql
    supabase/migrations/005_admin_read_functions.sql
    supabase/migrations/006_harden_rpc_grants.sql
+   supabase/migrations/007_safe_match_pairs_and_public_check.sql
+   supabase/migrations/008_harden_grade_response_grant.sql
+   supabase/migrations/009_extend_reveal_for_match_and_order.sql
    ```
    عبر SQL Editor في لوحة Supabase (نسخ/لصق كل ملف بالكامل وتنفيذه)، أو عبر:
    ```

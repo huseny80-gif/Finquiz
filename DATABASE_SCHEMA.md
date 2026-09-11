@@ -4,8 +4,11 @@
 `supabase/migrations/001_initial_schema.sql`، `002_rls.sql`، `003_functions.sql`،
 `004_fix_mcq_grading_operator.sql` (إصلاح صغير: استبدال `->>0` غير الموثّق بـ `#>>'{}'` الموثّق
 في تصحيح mcq داخل `save_quiz_answer`)، `005_admin_read_functions.sql` (دالة قراءة كاملة الأعمدة
-للأسئلة، admin/instructor فقط)، و`006_harden_rpc_grants.sql` (تشديد صلاحيات تنفيذ RPC — انظر
-تفاصيل الثلاثة الأخيرة في `IMPLEMENTATION_REPORT.md`).
+للأسئلة، admin/instructor فقط)، `006_harden_rpc_grants.sql` (تشديد صلاحيات تنفيذ RPC)،
+`007_safe_match_pairs_and_public_check.sql` (حل فجوة `question_pairs` + دالة `check_answer`
+العامة)، `008_harden_grade_response_grant.sql` (تشديد مماثل لـ006 على دالة داخلية جديدة)،
+و`009_extend_reveal_for_match_and_order.sql` (توسيع `reveal_question_answer` ليغطي match/order
+أيضاً لا mcq فقط) — انظر تفاصيل كل هذه في `IMPLEMENTATION_REPORT.md`.
 
 ## مبدأ التصميم: مفاتيح مزدوجة النوع
 
@@ -66,13 +69,29 @@ grant select (id, quiz_id, lecture_id, type, difficulty, prompt, kind, status, c
 بهذا فإن `select * from questions` من طرف العميل (anon/authenticated) يفشل، ولا يمكن اختراق هذا القيد
 حتى بصياغة استعلام مختلف — لأن الصلاحية غير موجودة أصلاً على مستوى العمود.
 
-## فجوة موثّقة وغير مكتملة: `question_pairs`
+## حل فجوة `question_pairs` (منذ 007)
 
-أسئلة المطابقة (`match`) تتطلب عرض الطرف الأيمن والأيسر للطالب دون كشف الترابط الصحيح بينهما. الحل
-الآمن الكامل (view بعرضين منفصلين: يسار مرتّب بـ `position`، ويمين مبعثر عشوائياً بمعزل عن أي علاقة
-مع اليسار) لم يُنفَّذ بعد في هذه المرحلة، والجدول مقصور حالياً على `admin`/`instructor` فقط — أي أن
-أسئلة المطابقة **غير قابلة للعرض للطلاب حتى إشعار آخر**. موثّق كذلك في `002_rls.sql` كتعليق `TODO`
-وفي `IMPLEMENTATION_REPORT.md`.
+أسئلة المطابقة (`match`) تتطلب عرض الطرف الأيمن والأيسر للطالب دون كشف الترابط الصحيح بينهما.
+الجدول `question_pairs` نفسه يبقى مقصوراً على `admin`/`instructor` فقط (كل صف يحمل الطرفين
+مترابطين، فلا يمكن منح قراءته جزئياً بأمان). الحل: دالة `get_match_pairs(question_id)`
+(`SECURITY DEFINER`، ممنوحة لـ `anon`/`authenticated`) تعيد الطرفين كمصفوفتين منفصلتين تماماً
+بلا أي ترابط بينهما — `left` مرتّبة حسب `position` (الترتيب نفسه ليس سرّاً)، و`right` بترتيب
+عشوائي مستقل يتغيّر مع كل استدعاء. `api.js` يستدعيها لكل سؤال مطابقة ضمن `fetchAllContent()`
+وتُبنى `pairsLeft`/`pairsRight` (لا `pairs` المترابطة) — راجع `assets/js/components/quiz-view.js`
+لكيفية تمييز الواجهة بين الشكلين. `reveal_question_answer` (منذ 009) تعيد الأزواج الصحيحة كاملة
+بعد إجابة الطالب لمستخدم مسجَّل فقط.
+
+## فجوة إضافية مكتشَفة ومحلولة: `select('*')` على أعمدة محجوبة جزئياً (منذ 007)
+
+`api.js` كان يستخدم `select('*')` على `questions`/`question_options`/`question_items` — وهذه
+الجداول محجوبة أعمدة منها جزئياً (`answer`/`rubric`/`explanation`/`is_correct`/`position` في
+`question_items`). تحقّق مباشر عبر `set role anon; select * from questions ...` على المشروع
+الحي أثبت أن هذا كان سيفشل بـ `42501 permission denied` فعلياً عند أي اتصال حقيقي — لم يُكتشف
+plus تواً لأن كل الاختبارات السابقة كانت تُحاكي عميل Supabase وهمياً يتجاهل الأعمدة المطلوبة. أُصلح
+باستخدام قوائم أعمدة صريحة تطابق الممنوح بالضبط، وحذف `.order('position')` عن `question_items`
+تحديداً (العمود نفسه غير ممنوح، والترتيب به كان سيفشل أيضاً) مع خلط العناصر عشوائياً في العميل بدلاً
+من الاعتماد على ترتيب إرجاع الصفوف (قد يطابق الترتيب الصحيح صدفة). مُختبر ببناء محاكي استعلامات في
+`tests/run.js` يحاكي قيود الأعمدة الفعلية ويفشل عمداً لو طُلب عمود غير ممنوح.
 
 ## دالة قراءة الإدارة: `admin_get_quiz_questions` (منذ 005)
 

@@ -446,11 +446,13 @@ function group(name) { console.log('\n▶ ' + name); }
     assert(page.url().includes('#/dashboard'), 'لم ينتقل لمسار لوحة الطالب');
   });
 
-  await test('لوحة الطالب تعرض حالة "قريباً" ما دام الاتصال الحي غير مفعَّل', async () => {
+  await test('لوحة الطالب تدعو لتسجيل الدخول بلا كشف أي بيانات (enabled:true، بلا جلسة فعلية)', async () => {
     await page.goto(base + '#/dashboard', { waitUntil: 'domcontentloaded' });
-    const text = await page.textContent('#main');
-    assert(text.includes('قريباً') || text.includes('Coming soon'), 'لم تظهر حالة عدم التوفر المتوقعة');
-    assert(!(await page.$('[data-dashboard-action="sign-in"]')), 'زر تسجيل الدخول لا يجوز ظهوره والاتصال معطَّل');
+    // enabled:true الآن يعني DLP.auth.isAvailable()=true، لكن لا توجد جلسة Supabase
+    // Auth فعلية في متصفح الاختبار (لا OAuth حقيقي هنا) — الحالة المتوقعة هي دعوة
+    // تسجيل الدخول، لا بطاقة "قريباً" (تلك كانت خاصة بـ enabled:false فقط).
+    assert(await page.$('[data-dashboard-action="sign-in"]'), 'يجب أن يظهر زر تسجيل الدخول الآن مع توفر الاتصال');
+    assert(!(await page.$('.progress-card')), 'لا يجوز ظهور أي بطاقة تقدّم فعلية قبل تسجيل دخول حقيقي');
   });
 
   await test('شريط المسار في لوحة الطالب صحيح', async () => {
@@ -461,17 +463,16 @@ function group(name) { console.log('\n▶ ' + name); }
 
   group('سقالة الإدارة (Admin scaffold)');
 
-  await test('لوحة الإدارة تعرض حالة "قريباً" ما دام الاتصال الحي غير مفعَّل', async () => {
+  await test('لوحة الإدارة تدعو لتسجيل الدخول بلا كشف أي سؤال (enabled:true، بلا جلسة فعلية)', async () => {
     await page.goto(base + '#/admin', { waitUntil: 'domcontentloaded' });
-    const text = await page.textContent('#main');
-    assert(text.includes('قريباً') || text.includes('Coming soon'), 'لم تظهر حالة عدم التوفر المتوقعة');
-    assert(!(await page.$('[data-admin-action="sign-in"]')), 'زر تسجيل الدخول لا يجوز ظهوره والاتصال معطَّل');
+    // enabled:true الآن يعني DLP.auth.isAvailable()=true؛ بلا جلسة Supabase Auth
+    // فعلية في متصفح الاختبار، الحالة المتوقعة دعوة تسجيل الدخول لا "قريباً".
+    assert(await page.$('[data-admin-action="sign-in"]'), 'يجب أن يظهر زر تسجيل الدخول الآن مع توفر الاتصال');
   });
 
-  await test('مسار عرض أسئلة اختبار محدَّد في الإدارة يعمل ويعرض نفس حالة "قريباً"', async () => {
+  await test('مسار عرض أسئلة اختبار محدَّد في الإدارة يدعو لتسجيل الدخول أيضاً بلا كشف', async () => {
     await page.goto(base + '#/admin/quiz/ai-q1', { waitUntil: 'domcontentloaded' });
-    const text = await page.textContent('#main');
-    assert(text.includes('قريباً') || text.includes('Coming soon'), 'لم تظهر حالة عدم التوفر المتوقعة');
+    assert(await page.$('[data-admin-action="sign-in"]'), 'يجب أن يظهر زر تسجيل الدخول لا كشف أسئلة الاختبار مباشرة');
   });
 
   group('التذييل والروابط');
@@ -591,7 +592,19 @@ function group(name) { console.log('\n▶ ' + name); }
     const urls = [base, base + '#/about', base + '#/search?q=المخاطر', base + '#/dashboard', base + '#/admin', base + '#/admin/quiz/ai-q1'];
     SUBJECTS.forEach((id) => SECTIONS.forEach((s) => urls.push(base + '#/subject/' + id + '/' + s)));
     for (const url of urls) { await page.goto(url, { waitUntil: 'domcontentloaded' }); }
-    assert(consoleErrors.length === 0, 'أخطاء: ' + consoleErrors.slice(0, 5).join(' | '));
+    // فشل شبكي على مستوى النقل (لا استثناء JS) عند محاولة hydrate() الاتصال بـ
+    // Supabase مقبول ومتوقَّع: hydrate() تسقط بهدوء على البيانات الثابتة (مُختبر
+    // في tests/run.js)، والمتصفح نفسه يسجّل "Failed to load resource" في الـ
+    // console تلقائياً لأي طلب شبكي فاشل بصرف النظر عن معالجة JS — هذا سلوك
+    // متصفح لا خطأ برمجي، ويظهر في بيئات بلا وصول شبكي حقيقي لمشروع Supabase
+    // (كما في بيئة تطوير هذه الجلسة). لا نتجاهل أي خطأ آخر.
+    // نمط "Failed to load resource: net::ERR_..." يُسجّله المتصفح نفسه تلقائياً
+    // لأي طلب شبكي فاشل على مستوى النقل (DNS/TLS/اتصال) — لا يظهر أبداً لخطأ JS
+    // حقيقي (استثناء غير معالَج أو console.error من كود الصفحة)، فتصفيته هنا آمنة
+    // ولا تُخفي أي عطل برمجي فعلي.
+    const isNetworkTransportFailure = (msg) => /Failed to load resource:\s*net::ERR_/.test(msg);
+    const realErrors = consoleErrors.filter((msg) => !isNetworkTransportFailure(msg));
+    assert(realErrors.length === 0, 'أخطاء: ' + realErrors.slice(0, 5).join(' | '));
   });
 
   await browser.close();

@@ -107,11 +107,30 @@
    * إلا مرة واحدة عند بدء التطبيق (app.js) قبل أول رسم للصفحة. لا ترمي أبداً؛
    * تُعيد Promise<boolean> (true = نجحت واستُبدلت البيانات، false = بقيت الثابتة).
    */
+  var HYDRATE_TIMEOUT_MS = 6000;
+
+  /** يضمن أن hydrate() لا يُعلّق تحميل الصفحة أبداً مهما بطؤ الاتصال أو عَلِق —
+   * app.js ينتظرها (await) كأول سطر في init() قبل أي رسم؛ اتصال بطيء بلا هذه
+   * المهلة يعني تعليق الموقع بالكامل بدل السقوط السريع على البيانات الثابتة. */
+  function withTimeout(promise, ms) {
+    return new Promise(function (resolve, reject) {
+      var settled = false;
+      var timer = setTimeout(function () {
+        if (!settled) { settled = true; reject(new Error('انتهت مهلة الاتصال بالقاعدة')); }
+      }, ms);
+      promise.then(function (value) {
+        if (!settled) { settled = true; clearTimeout(timer); resolve(value); }
+      }, function (error) {
+        if (!settled) { settled = true; clearTimeout(timer); reject(error); }
+      });
+    });
+  }
+
   function hydrate() {
     if (!DLP.api || typeof DLP.api.isReady !== 'function' || !DLP.api.isReady()) {
       return Promise.resolve(false);
     }
-    return DLP.api.fetchAllContent().then(function (result) {
+    return withTimeout(DLP.api.fetchAllContent(), HYDRATE_TIMEOUT_MS).then(function (result) {
       if (!result || !result.data || !result.order) { return false; }
       // استبدال ذرّي دفعة واحدة — لا يُكتب أي جزء من البيانات القديمة فوق الجديدة
       // ولا العكس، فلا تُترك المنصة في حالة بيانات مختلطة عند نجاح جزئي.
@@ -120,7 +139,7 @@
       DATA_SOURCE = 'database';
       return true;
     }).catch(function () {
-      return false; // فشل الاتصال/الاستعلام: تبقى البيانات الثابتة كما هي (fallback).
+      return false; // فشل/تعليق/انتهاء مهلة الاتصال: تبقى البيانات الثابتة كما هي (fallback).
     });
   }
 

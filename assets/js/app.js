@@ -139,17 +139,23 @@
     '</div>' + DLP.layout.endActions() + '</div>');
   }
 
-  async function init() {
-    // محاولة وحيدة لملء البيانات من Supabase قبل أي رسم — تسقط بهدوء على البيانات
-    // الثابتة الحالية عند أي فشل أو غياب اتصال (انظر core/store.js hydrate()).
-    await DLP.store.hydrate();
-
-    // بناء الهيكل الثابت مرة واحدة
+  /** يعيد رسم الهيكل الثابت (Header/Sidebar/Footer/BottomNav) وإعادة ربط أحداثه. */
+  function renderShell() {
     el('shellHeader').innerHTML = DLP.layout.renderHeader();
     el('shellFooter').innerHTML = DLP.layout.renderFooter();
     el('shellSidebar').outerHTML = DLP.layout.renderSidebar();
     el('shellBottomNav').innerHTML = DLP.layout.renderBottomNav();
+    // ملاحظة: bindShell() تُستدعى أيضاً لاحقاً عند نجاح hydrate() (انظر init())،
+    // فتُعاد ربط بعض المستمعات على مستوى document/window (scroll-top، fab) مرتين
+    // — تأثير عديم الضرر (toggle/scroll idempotent) لا يستحق تعقيد فصل الدالة.
     DLP.layout.bindShell();
+  }
+
+  function init() {
+    // رسم فوري بالبيانات المتاحة حالياً (ثابتة افتراضياً) — لا ننتظر الشبكة أبداً
+    // قبل أول عرض؛ صفحة فارغة لثوانٍ ريثما يُحسم اتصال Supabase تجربة أسوأ من عرض
+    // فوري ثم تحديث لاحق صامت عند نجاح hydrate() (انظر أسفله).
+    renderShell();
 
     DLP.router.add('/', renderHome);
     DLP.router.add('/search', renderSearch);
@@ -164,6 +170,16 @@
     DLP.router.add('/subject/:id/:section', renderSubject);
     DLP.router.setNotFound(renderNotFound);
     DLP.router.start();
+
+    // محاولة ملء البيانات من Supabase في الخلفية بمعزل تام عن العرض الأول — تسقط
+    // بهدوء على البيانات الثابتة عند أي فشل/بطء/غياب اتصال (انظر core/store.js
+    // hydrate()، بما فيها مهلتها الداخلية). عند النجاح فقط، نُعيد رسم الهيكل
+    // والمسار الحالي مرة واحدة ليعكسا البيانات الحقيقية.
+    DLP.store.hydrate().then(function (changed) {
+      if (!changed) { return; }
+      renderShell();
+      DLP.router.navigate(global.location.hash || '#/');
+    });
   }
 
   if (document.readyState === 'loading') { document.addEventListener('DOMContentLoaded', init); }

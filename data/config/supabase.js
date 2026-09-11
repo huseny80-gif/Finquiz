@@ -17,15 +17,21 @@
     url: 'https://kotbarynxzyhxhzribpf.supabase.co',
     publishableKey: 'sb_publishable_fYEDizdjzzxiQTHvGks2Hw_IGHXqTCn',
     /**
-     * معطَّل عمداً حتى الآن رغم أن كل طبقة الاتصال (supabase.js/api.js/auth.js)
-     * وhydrate() في core/store.js مكتملة ومُختبرة: أسئلة المطابقة (question_pairs)
-     * محجوبة بالكامل عن anon في RLS الحالي (فجوة موثّقة في DATABASE_SCHEMA.md)،
-     * وتفعيل القراءة الحية الآن يعني وصول pairs=[] لكل سؤال مطابقة على الموقع
-     * الفعلي — أي كسر صامت لنوع سؤال كامل. لا يُفعَّل (true) قبل حل تلك الفجوة
-     * والتحقق يدوياً بمتصفح حقيقي متصل بالمشروع. الموقع يعمل حالياً بالكامل من
-     * الملفات الثابتة بلا أي فرق ملحوظ.
+     * مفعَّل: القراءة الحية من القاعدة (hydrate()) نشطة. الفجوتان اللتان كانتا
+     * تمنعان هذا سابقاً حُلَّتا:
+     * 1) question_pairs (أسئلة المطابقة) — get_match_pairs() RPC تعيد الطرفين
+     *    كمصفوفتين منفصلتين تماماً بلا ترابط (007_safe_match_pairs_and_public_check.sql).
+     * 2) api.js كان يستخدم select('*') على questions/question_options/question_items —
+     *    هذه الأعمدة محجوبة جزئياً على مستوى العمود (002_rls.sql)، وselect('*') كان
+     *    سيفشل بـ 42501 فعلياً على أي اتصال حقيقي. أُصلح باستخدام قوائم أعمدة صريحة
+     *    تطابق ما هو ممنوح بالضبط (انظر assets/js/core/api.js وtests/run.js التي
+     *    تحاكي هذا القيد فعلياً وتفشل عمداً لو رجع select('*')).
+     * التصحيح لمحتوى القاعدة أصبح خادمياً (check_answer/save_quiz_answer عبر RPC)
+     * بدل المقارنة المحلية المباشرة — انظر quiz-view.js وIMPLEMENTATION_REPORT.md
+     * لتفاصيل ما تحقّق منه فعلياً قبل هذا التفعيل، وما تبقّى غير مُتحقَّق منه في
+     * متصفح حقيقي متصل (محجوب في بيئة تطوير هذه الجلسة بسياسة شبكة خارجية).
      */
-    enabled: false
+    enabled: true
   };
 
   global.DLP = global.DLP || {};
