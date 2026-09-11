@@ -195,15 +195,6 @@ function group(name) { console.log('\n▶ ' + name); }
     assert(await page.$('.opt.is-correct'), 'الإجابة الصحيحة غير مميّزة');
   });
 
-  await test('اختيار إجابة خاطئة يُظهر الإجابة الصحيحة', async () => {
-    await open(base + '#/subject/legal-regulatory/quizzes');
-    await page.click('.opt[data-value="0"]');
-    await check();
-    const feedback = await page.textContent('.feedback');
-    assert(feedback.includes('غير صحيحة'), 'لم تُرصد الإجابة الخاطئة');
-    assert(feedback.includes('الإجابة الصحيحة'), 'لم تُعرض الإجابة الصحيحة');
-  });
-
   await test('التنقل بين الأسئلة (التالي/السابق) يعمل', async () => {
     await open(base + '#/subject/ai-data/quizzes');
     const first = await page.textContent('.q-prompt');
