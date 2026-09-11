@@ -28,27 +28,39 @@
   /* قراءة المحتوى العام (بلا تسجيل دخول) — تعيد نفس أشكال data/subjects/*.js */
   /* -------------------------------------------------------------------- */
 
-  function mapLecture(row) {
+  /** يبني كائن ملف بنفس شكل {type,label,url} الذي يستهلكه fileChip() في
+   * components/subject.js — مطابق تماماً لشكل data/subjects/*.js الثابت.
+   * ملاحظة: لا Supabase Storage bucket فعلي بعد (انظر SUPABASE_MIGRATION_AUDIT.md) —
+   * كل الملفات المبذورة اليوم تحمل مساراً ثابتاً نسبياً داخل public_url (نفس قيمة
+   * url في البيانات الثابتة)؛ storage_path محجوز لمرحلة رفع فعلية لاحقة ولا يُستخدَم
+   * هنا بعد لبناء رابط (لا توجد دالة تحويله إلى رابط عام دون bucket حقيقي).
+   */
+  function mapFile(row) {
+    return { type: row.type, label: row.label, url: row.public_url || null };
+  }
+
+  function mapLecture(row, filesByLecture) {
     return {
       id: row.id, number: row.number, title: row.title, date: row.date,
       status: row.status, demo: row.demo, description: row.description,
-      objectives: row.objectives || [], files: []
+      objectives: row.objectives || [], files: (filesByLecture[row.id] || []).map(mapFile)
     };
   }
 
-  function mapSummary(row) {
+  function mapSummary(row, filesBySummary) {
     return {
       id: row.id, lectureId: row.lecture_id, title: row.title, date: row.date,
       status: row.status, demo: row.demo,
       keyPoints: row.key_points || [], concepts: row.concepts || [], terms: row.terms || [],
-      files: []
+      files: (filesBySummary[row.id] || []).map(mapFile)
     };
   }
 
-  function mapAssignment(row) {
+  function mapAssignment(row, filesByAssignment) {
     return {
       id: row.id, title: row.title, difficulty: row.difficulty, date: row.date,
-      due: row.due, status: row.status, demo: row.demo, description: row.description, files: []
+      due: row.due, status: row.status, demo: row.demo, description: row.description,
+      files: (filesByAssignment[row.id] || []).map(mapFile)
     };
   }
 
@@ -150,7 +162,11 @@
       c.from('quizzes').select('*').eq('subject_id', subjectId),
       c.from('references').select('*').eq('subject_id', subjectId),
       c.from('resources').select('*').eq('subject_id', subjectId),
-      c.from('updates').select('*').eq('subject_id', subjectId).order('date', { ascending: false })
+      c.from('updates').select('*').eq('subject_id', subjectId).order('date', { ascending: false }),
+      // جدول files عديم الشكل (لا قيود أعمدة عليه، بخلاف questions) — يُجلَب مرة واحدة
+      // لكل مادة ثم يُوزَّع محلياً على المحاضرات/الملخصات/الواجبات بمعرّفها، بدل استعلام
+      // منفصل لكل صفّ (أداء).
+      c.from('files').select('*').eq('subject_id', subjectId)
     ]).then(function (results) {
       var lectures = unwrap(results[0]) || [];
       var summaries = unwrap(results[1]) || [];
@@ -159,11 +175,16 @@
       var references = unwrap(results[4]) || [];
       var resources = unwrap(results[5]) || [];
       var updates = unwrap(results[6]) || [];
+      var files = unwrap(results[7]) || [];
+      var filesByLecture = groupBy(files, 'lecture_id');
+      var filesBySummary = groupBy(files, 'summary_id');
+      var filesByAssignment = groupBy(files, 'assignment_id');
 
       var quizIds = quizzes.map(function (q) { return q.id; });
       if (!quizIds.length) {
         return assembleSubject(subjectRow, lectures, summaries, assignments,
-          quizzes, [], {}, {}, {}, references, resources, updates);
+          quizzes, [], {}, {}, {}, references, resources, updates,
+          filesByLecture, filesBySummary, filesByAssignment);
       }
 
       // أعمدة questions محدَّدة صراحةً (لا select('*')): answer/rubric/explanation
@@ -182,7 +203,8 @@
         var questionIds = questions.map(function (q) { return q.id; });
         if (!questionIds.length) {
           return assembleSubject(subjectRow, lectures, summaries, assignments,
-            quizzes, questions, {}, {}, {}, references, resources, updates);
+            quizzes, questions, {}, {}, {}, references, resources, updates,
+            filesByLecture, filesBySummary, filesByAssignment);
         }
         var matchIds = questions.filter(function (q) { return q.type === 'match'; }).map(function (q) { return q.id; });
         return Promise.all([
@@ -207,23 +229,28 @@
           subResults[2].forEach(function (entry) { pairsByQuestion[entry.id] = entry.pairs; });
           return assembleSubject(subjectRow, lectures, summaries, assignments,
             quizzes, questions, groupBy(options, 'question_id'), groupBy(items, 'question_id'),
-            pairsByQuestion, references, resources, updates);
+            pairsByQuestion, references, resources, updates,
+            filesByLecture, filesBySummary, filesByAssignment);
         });
       });
     });
   }
 
   function assembleSubject(subjectRow, lectures, summaries, assignments, quizzes,
-    questions, optionsByQuestion, itemsByQuestion, pairsByQuestion, references, resources, updates) {
+    questions, optionsByQuestion, itemsByQuestion, pairsByQuestion, references, resources, updates,
+    filesByLecture, filesBySummary, filesByAssignment) {
     var questionsByQuiz = groupBy(questions, 'quiz_id');
+    filesByLecture = filesByLecture || {};
+    filesBySummary = filesBySummary || {};
+    filesByAssignment = filesByAssignment || {};
 
     return {
       id: subjectRow.id, order: subjectRow.order, title: subjectRow.title,
       shortTitle: subjectRow.short_title, icon: subjectRow.icon, accent: subjectRow.accent,
       status: subjectRow.status, description: subjectRow.description,
-      lectures: lectures.map(mapLecture),
-      summaries: summaries.map(mapSummary),
-      assignments: assignments.map(mapAssignment),
+      lectures: lectures.map(function (row) { return mapLecture(row, filesByLecture); }),
+      summaries: summaries.map(function (row) { return mapSummary(row, filesBySummary); }),
+      assignments: assignments.map(function (row) { return mapAssignment(row, filesByAssignment); }),
       quizzes: quizzes.map(function (quiz) {
         return {
           id: quiz.id, title: quiz.title, status: quiz.status, demo: quiz.demo,

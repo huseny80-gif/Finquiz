@@ -767,6 +767,33 @@ testAsync('fetchAllContent(): لا يطلب أي عمود غير ممنوح فع
   equal(client.__calls.rpc.length, 1, 'get_match_pairs يُستدعى مرة واحدة فقط لسؤال المطابقة الوحيد');
 });
 
+testAsync('fetchAllContent(): يصل ملفات جدول files الفعلية للمحاضرات/الملخصات/الواجبات (لم تعد [] دائماً)', async () => {
+  // إصلاح Phase B: mapLecture/mapSummary/mapAssignment كانت تُثبّت files:[] دائماً
+  // بصرف النظر عن محتوى جدول files الفعلي — انظر SUPABASE_MIGRATION_AUDIT.md §1.5/§4.3.
+  const seedRows = {
+    subjects: [{ id: 's1', order: 1, title: 'مادة', short_title: 'م', icon: '📘', accent: '#000', status: 'published', description: '' }],
+    lectures: [{ id: 'l1', subject_id: 's1', number: 1, title: 'محاضرة', date: '', status: 'published', demo: false, description: '', objectives: [] }],
+    summaries: [{ id: 's-sum1', subject_id: 's1', lecture_id: 'l1', title: 'ملخص', date: '', status: 'published', demo: false, key_points: [], concepts: [], terms: [] }],
+    assignments: [{ id: 'a1', subject_id: 's1', title: 'واجب', difficulty: 'easy', date: '', due: '', status: 'published', demo: false, description: '' }],
+    quizzes: [], references: [], resources: [], updates: [],
+    files: [
+      { id: 'f1', subject_id: 's1', lecture_id: 'l1', summary_id: null, assignment_id: null, type: 'pdf', label: 'ملف المحاضرة', storage_path: null, public_url: 'files/s1/lecture-01.pdf', status: 'published' },
+      { id: 'f2', subject_id: 's1', lecture_id: null, summary_id: 's-sum1', assignment_id: null, type: 'link', label: 'ملخص تفاعلي', storage_path: null, public_url: 'files/s1/summary-01.html', status: 'published' },
+      { id: 'f3', subject_id: 's1', lecture_id: null, summary_id: null, assignment_id: 'a1', type: 'pdf', label: 'ملف الواجب', storage_path: null, public_url: 'files/s1/assignment-01.pdf', status: 'published' }
+    ],
+    questions: [], question_options: [], question_items: []
+  };
+  const client = fakeColumnCheckingClient(seedRows, {});
+  const sbDLP = loadSupabaseLayer({ configOverride: { enabled: true }, fakeClientLib: { createClient: () => client } });
+
+  const result = await sbDLP.api.fetchAllContent();
+  const subject = result.data.s1;
+  equal(subject.lectures[0].files.length, 1, 'ملف المحاضرة يجب أن يصل عبر jointure files.lecture_id');
+  equal(subject.lectures[0].files[0].url, 'files/s1/lecture-01.pdf', 'رابط الملف يجب أن يُبنى من public_url');
+  equal(subject.summaries[0].files.length, 1, 'ملف الملخص يجب أن يصل عبر files.summary_id');
+  equal(subject.assignments[0].files.length, 1, 'ملف الواجب يجب أن يصل عبر files.assignment_id');
+});
+
 testAsync('fetchAllContent(): يرتّب الأسئلة برقم تسلسلها من المعرّف بصرف النظر عن ترتيب إرجاع القاعدة', async () => {
   // اكتُشف فعلياً عبر CI حقيقي (شبكة متصلة بمشروع Supabase فعلي): questions لا
   // تحمل عمود ترتيب صريح، واستعلام بلا order() لا يضمن أي تسلسل معيَّن — أعاد
