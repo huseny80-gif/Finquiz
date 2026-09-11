@@ -594,6 +594,9 @@ test('مفاتيح ناقصة (بلا url) تمنع إنشاء العميل به
 test('مكتبة عميل + مفاتيح صحيحة → عميل جاهز فعلاً', () => {
   let calledWith = null;
   const DLP = loadSupabaseLayer({
+    // enabled معطَّل افتراضياً في data/config/supabase.js حالياً (فجوة question_pairs
+    // الموثّقة) — هذا الاختبار يتحقق من مسار "التفعيل" نفسه بمعزل عن ذلك القرار.
+    configOverride: { enabled: true },
     fakeClientLib: {
       createClient(url, key) { calledWith = [url, key]; return { fake: true }; }
     }
@@ -608,7 +611,10 @@ test('api.isReady() تعكس حالة العميل بدقّة (true/false)', () 
   const withoutClient = loadSupabaseLayer({});
   equal(withoutClient.api.isReady(), false, 'isReady يجب أن تكون false بلا عميل');
 
-  const withClient = loadSupabaseLayer({ fakeClientLib: { createClient: () => ({ fake: true }) } });
+  const withClient = loadSupabaseLayer({
+    configOverride: { enabled: true },
+    fakeClientLib: { createClient: () => ({ fake: true }) }
+  });
   equal(withClient.api.isReady(), true, 'isReady يجب أن تكون true مع عميل');
 });
 
@@ -636,6 +642,72 @@ testAsync('auth.signOut() لا ترمي حتى بلا عميل (لا حساب ل
   const DLP = loadSupabaseLayer({});
   await DLP.auth.signOut();
   assert(true, 'اكتملت بلا استثناء');
+});
+
+test('التفعيل الفعلي (enabled) معطَّل افتراضياً — فجوة question_pairs لم تُحل بعد', () => {
+  const configDLP = loadSupabaseLayer({});
+  assert(configDLP.config.supabase.enabled === false,
+    'enabled يجب أن يبقى false حتى يُحل TODO أسئلة المطابقة في 002_rls.sql');
+});
+
+/* -------------------- store.hydrate() — الاستبدال الذرّي وسقوط fallback -------------------- */
+
+/** يحمّل نسخة معزولة من core/store.js مع بيانات ثابتة لمادة واحدة فقط، ليمكن
+ * حقن DLP.api وهمي والتحقّق من hydrate() بمعزل عن بقية اختبارات DLP المشتركة. */
+function loadStoreLayer() {
+  const sandbox = { console, addEventListener() {}, document: null };
+  sandbox.window = sandbox;
+  sandbox.globalThis = sandbox;
+  vm.createContext(sandbox);
+  ['data/config/site.js', 'data/subjects/index.js', 'data/subjects/ai-data.js',
+    'assets/js/core/store.js'].forEach((file) => {
+    vm.runInContext(fs.readFileSync(path.join(ROOT, file), 'utf8'), sandbox, { filename: file });
+  });
+  return sandbox.DLP;
+}
+
+testAsync('hydrate() بلا DLP.api: تُعيد false وتُبقي البيانات الثابتة كما هي', async () => {
+  const sbDLP = loadStoreLayer();
+  const before = sbDLP.store.subjects().map((s) => s.id);
+  const changed = await sbDLP.store.hydrate();
+  equal(changed, false, 'يجب أن تُعيد hydrate() false بلا DLP.api');
+  equal(sbDLP.store.dataSource(), 'static', 'dataSource يجب أن تبقى static');
+  equal(sbDLP.store.subjects().map((s) => s.id).join(','), before.join(','), 'البيانات تغيّرت رغم غياب api!');
+});
+
+testAsync('hydrate() تستبدل البيانات ذرّياً عند نجاح api.fetchAllContent()', async () => {
+  const sbDLP = loadStoreLayer();
+  const fakeSubject = { id: 'fake-subject', order: 1, title: 'مادة وهمية', status: 'published',
+    lectures: [], summaries: [], assignments: [], quizzes: [], references: [], resources: [], updates: [] };
+  sbDLP.api = {
+    isReady: () => true,
+    fetchAllContent: () => Promise.resolve({ data: { 'fake-subject': fakeSubject }, order: ['fake-subject'] })
+  };
+  const changed = await sbDLP.store.hydrate();
+  equal(changed, true, 'يجب أن تُعيد hydrate() true عند النجاح');
+  equal(sbDLP.store.dataSource(), 'database', 'dataSource يجب أن تصبح database');
+  const ids = sbDLP.store.subjects().map((s) => s.id);
+  equal(ids.length, 1, 'عدد المواد بعد الاستبدال');
+  equal(ids[0], 'fake-subject', 'المادة المُستبدَلة غير متوقعة');
+});
+
+testAsync('hydrate() تسقط بهدوء على البيانات الثابتة عند رفض fetchAllContent()', async () => {
+  const sbDLP = loadStoreLayer();
+  const before = sbDLP.store.subjects().map((s) => s.id);
+  sbDLP.api = { isReady: () => true, fetchAllContent: () => Promise.reject(new Error('انقطاع شبكة')) };
+  const changed = await sbDLP.store.hydrate();
+  equal(changed, false, 'يجب أن تُعيد hydrate() false عند الرفض');
+  equal(sbDLP.store.dataSource(), 'static', 'dataSource يجب أن تبقى static عند الفشل');
+  equal(sbDLP.store.subjects().map((s) => s.id).join(','), before.join(','), 'البيانات تغيّرت رغم فشل الجلب!');
+});
+
+testAsync('hydrate() تسقط بهدوء إن أعادت fetchAllContent() شكلاً ناقصاً', async () => {
+  const sbDLP = loadStoreLayer();
+  const before = sbDLP.store.subjects().map((s) => s.id);
+  sbDLP.api = { isReady: () => true, fetchAllContent: () => Promise.resolve({}) };
+  const changed = await sbDLP.store.hydrate();
+  equal(changed, false, 'يجب أن تُعيد hydrate() false لشكل ناقص');
+  equal(sbDLP.store.subjects().map((s) => s.id).join(','), before.join(','), 'البيانات تغيّرت رغم شكل ناقص!');
 });
 
 /* ------------------------------ النتيجة ------------------------------ */

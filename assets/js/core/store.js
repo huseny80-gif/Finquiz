@@ -4,6 +4,11 @@
 
   var DLP = global.DLP = global.DLP || {};
 
+  /** 'static' = من <script> tags الثابتة (الافتراضي والحالة الوحيدة اليوم).
+   * 'database' = بعد نجاح hydrate() من Supabase. لا تُقرأ هذه القيمة مباشرة من
+   * خارج هذا الملف — استخدم dataSource(). */
+  var DATA_SOURCE = 'static';
+
   var SECTIONS = [
     { key: 'lectures',    labelKey: 'section.lectures',    icon: '🎓', num: '01' },
     { key: 'summaries',   labelKey: 'section.summaries',   icon: '📝', num: '02' },
@@ -93,6 +98,32 @@
     return found.length ? found[0] : null;
   }
 
+  function dataSource() { return DATA_SOURCE; }
+
+  /**
+   * يملأ DLP.data/DLP.subjectOrder من Supabase عبر core/api.js عند توفّر اتصال
+   * جاهز، وإلا (أو عند أي فشل) تبقى البيانات الثابتة الحالية دون أي تغيير —
+   * Adapter كامل: لا تغيير في توقيع أي دالة عامة أخرى في هذا الملف، ولا تُستدعى
+   * إلا مرة واحدة عند بدء التطبيق (app.js) قبل أول رسم للصفحة. لا ترمي أبداً؛
+   * تُعيد Promise<boolean> (true = نجحت واستُبدلت البيانات، false = بقيت الثابتة).
+   */
+  function hydrate() {
+    if (!DLP.api || typeof DLP.api.isReady !== 'function' || !DLP.api.isReady()) {
+      return Promise.resolve(false);
+    }
+    return DLP.api.fetchAllContent().then(function (result) {
+      if (!result || !result.data || !result.order) { return false; }
+      // استبدال ذرّي دفعة واحدة — لا يُكتب أي جزء من البيانات القديمة فوق الجديدة
+      // ولا العكس، فلا تُترك المنصة في حالة بيانات مختلطة عند نجاح جزئي.
+      global.DLP.data = result.data;
+      global.DLP.subjectOrder = result.order;
+      DATA_SOURCE = 'database';
+      return true;
+    }).catch(function () {
+      return false; // فشل الاتصال/الاستعلام: تبقى البيانات الثابتة كما هي (fallback).
+    });
+  }
+
   DLP.store = {
     SECTIONS: SECTIONS,
     isVisible: isVisible,
@@ -103,7 +134,9 @@
     countQuestions: countQuestions,
     stats: stats,
     latestUpdates: latestUpdates,
-    findQuiz: findQuiz
+    findQuiz: findQuiz,
+    dataSource: dataSource,
+    hydrate: hydrate
   };
 
   if (typeof module !== 'undefined' && module.exports) { module.exports = DLP.store; }

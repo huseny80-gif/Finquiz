@@ -121,7 +121,11 @@
     '</div>' + DLP.layout.endActions() + '</div>');
   }
 
-  function init() {
+  async function init() {
+    // محاولة وحيدة لملء البيانات من Supabase قبل أي رسم — تسقط بهدوء على البيانات
+    // الثابتة الحالية عند أي فشل أو غياب اتصال (انظر core/store.js hydrate()).
+    await DLP.store.hydrate();
+
     // بناء الهيكل الثابت مرة واحدة
     el('shellHeader').innerHTML = DLP.layout.renderHeader();
     el('shellFooter').innerHTML = DLP.layout.renderFooter();

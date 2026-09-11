@@ -16,8 +16,16 @@
   var SUPABASE_CONFIG = {
     url: 'https://kotbarynxzyhxhzribpf.supabase.co',
     publishableKey: 'sb_publishable_fYEDizdjzzxiQTHvGks2Hw_IGHXqTCn',
-    /** أوقف الاتصال بالكامل بتغيير هذه القيمة إلى false — الموقع يعمل بالكامل من الملفات الثابتة. */
-    enabled: true
+    /**
+     * معطَّل عمداً حتى الآن رغم أن كل طبقة الاتصال (supabase.js/api.js/auth.js)
+     * وhydrate() في core/store.js مكتملة ومُختبرة: أسئلة المطابقة (question_pairs)
+     * محجوبة بالكامل عن anon في RLS الحالي (فجوة موثّقة في DATABASE_SCHEMA.md)،
+     * وتفعيل القراءة الحية الآن يعني وصول pairs=[] لكل سؤال مطابقة على الموقع
+     * الفعلي — أي كسر صامت لنوع سؤال كامل. لا يُفعَّل (true) قبل حل تلك الفجوة
+     * والتحقق يدوياً بمتصفح حقيقي متصل بالمشروع. الموقع يعمل حالياً بالكامل من
+     * الملفات الثابتة بلا أي فرق ملحوظ.
+     */
+    enabled: false
   };
 
   global.DLP = global.DLP || {};
