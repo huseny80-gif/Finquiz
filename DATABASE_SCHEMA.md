@@ -1,7 +1,9 @@
 # مخطط قاعدة بيانات Finquiz على Supabase/PostgreSQL
 
 يوثّق هذا الملف المخطط المطبَّق فعلياً على مشروع Supabase الحي (`kotbarynxzyhxhzribpf`) عبر
-`supabase/migrations/001_initial_schema.sql`، `002_rls.sql`، و`003_functions.sql`.
+`supabase/migrations/001_initial_schema.sql`، `002_rls.sql`، `003_functions.sql`، و
+`004_fix_mcq_grading_operator.sql` (إصلاح صغير: استبدال `->>0` غير الموثّق بـ `#>>'{}'` الموثّق
+في تصحيح mcq داخل `save_quiz_answer` — تحقّق تجريبي كامل في `IMPLEMENTATION_REPORT.md`).
 
 ## مبدأ التصميم: مفاتيح مزدوجة النوع
 

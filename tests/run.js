@@ -710,6 +710,180 @@ testAsync('hydrate() تسقط بهدوء إن أعادت fetchAllContent() شك�
   equal(sbDLP.store.subjects().map((s) => s.id).join(','), before.join(','), 'البيانات تغيّرت رغم شكل ناقص!');
 });
 
+/* -------------------- quiz-view.js — الحفظ الدائم عبر RPC (Stage 2) -------------------- */
+group('quiz-view — الحفظ الدائم لمستخدم مسجَّل (بلا تغيير في التصحيح المحلي)');
+
+/** يحمّل نسخة معزولة من quiz-view.js في sandbox، مع DLP.auth/DLP.api وهميّين
+ * يُحقنان قبل تنفيذ الملف (كما يحدث فعلياً عند تحميل السكربتات بترتيبها في
+ * index.html). لا DOM هنا؛ الاختبارات تقتصر على منطق الحفظ (__test) الذي لا
+ * يلمس document إطلاقاً — رسم الواجهة وربط الأحداث مغطّيان بالفعل بـ tests/e2e.js. */
+function loadQuizViewLayer(options) {
+  options = options || {};
+  const sandbox = { console, addEventListener() {}, document: null };
+  sandbox.window = sandbox;
+  sandbox.globalThis = sandbox;
+  sandbox.DLP = { auth: options.fakeAuth, api: options.fakeApi };
+  vm.createContext(sandbox);
+  vm.runInContext(fs.readFileSync(path.join(ROOT, 'assets/js/components/quiz-view.js'), 'utf8'),
+    sandbox, { filename: 'assets/js/components/quiz-view.js' });
+  return sandbox.DLP;
+}
+
+function fakeAuthWithUser(user) {
+  return { onChange: (cb) => { cb(user); return () => {}; } };
+}
+function fakeAuthNoUser() {
+  return { onChange: (cb) => { cb(null); return () => {}; } };
+}
+
+test('canPersist(): false بلا مستخدم مسجَّل حتى مع عميل جاهز', () => {
+  const sbDLP = loadQuizViewLayer({ fakeAuth: fakeAuthNoUser(), fakeApi: { isReady: () => true } });
+  equal(sbDLP.quizView.__test.canPersist(), false, 'لا يجوز الحفظ بلا مستخدم');
+});
+
+test('canPersist(): false مع مستخدم مسجَّل لكن بلا اتصال جاهز (isReady=false)', () => {
+  const sbDLP = loadQuizViewLayer({
+    fakeAuth: fakeAuthWithUser({ id: 'u1' }), fakeApi: { isReady: () => false }
+  });
+  equal(sbDLP.quizView.__test.canPersist(), false, 'لا يجوز الحفظ بلا اتصال جاهز');
+});
+
+test('canPersist(): true مع مستخدم مسجَّل واتصال جاهز معاً', () => {
+  const sbDLP = loadQuizViewLayer({
+    fakeAuth: fakeAuthWithUser({ id: 'u1' }), fakeApi: { isReady: () => true }
+  });
+  equal(sbDLP.quizView.__test.canPersist(), true, 'يجب السماح بالحفظ');
+});
+
+test('canPersist(): false بلا DLP.auth أصلاً (لا يرمي عند التحميل)', () => {
+  const sbDLP = loadQuizViewLayer({ fakeApi: { isReady: () => true } });
+  equal(sbDLP.quizView.__test.canPersist(), false, 'DLP.auth غائب يجب أن يعني عدم السماح لا رمي استثناء');
+});
+
+test('toServerResponse(): يحوّل كل نوع سؤال للشكل الذي يتوقعه save_quiz_answer', () => {
+  const sbDLP = loadQuizViewLayer({});
+  const toServer = sbDLP.quizView.__test.toServerResponse;
+  equal(toServer({ type: 'mcq' }, '2'), 2, 'mcq يجب أن يصبح رقماً');
+  equal(toServer({ type: 'tf' }, 'true'), true, 'tf نص "true" يجب أن يصبح boolean');
+  equal(toServer({ type: 'tf' }, 'false'), false, 'tf نص "false" يجب أن يصبح boolean');
+  equal(toServer({ type: 'fill' }, '  إجابة  '), '  إجابة  ', 'fill يبقى نصاً كما هو (التنظيف من مسؤولية الخادم)');
+  equal(toServer({ type: 'open' }, 'نص حر'), 'نص حر', 'open يبقى نصاً');
+  const orderResult = toServer({ type: 'order' }, ['ب', 'أ']);
+  assert(Array.isArray(orderResult) && orderResult.join(',') === 'ب,أ', 'order يجب أن يبقى مصفوفة بنفس الترتيب');
+  const matchResult = toServer({ type: 'match' }, ['س1', 'س2']);
+  assert(Array.isArray(matchResult) && matchResult.join(',') === 'س1,س2', 'match يجب أن يبقى مصفوفة بنفس القيم');
+  const badArray = toServer({ type: 'order' }, null);
+  assert(Array.isArray(badArray) && badArray.length === 0, 'order بلا استجابة يجب أن يعيد مصفوفة فارغة لا يرمي');
+});
+
+testAsync('persistAnswer(): بلا مستخدم مسجَّل لا تستدعي أي RPC إطلاقاً', async () => {
+  let called = false;
+  const sbDLP = loadQuizViewLayer({
+    fakeAuth: fakeAuthNoUser(),
+    fakeApi: { isReady: () => true, startQuizAttempt: () => { called = true; return Promise.resolve('a1'); } }
+  });
+  const ok = await sbDLP.quizView.__test.persistAnswer({ id: 'q1' }, { id: 'ai-q1-1', type: 'mcq' }, 1);
+  equal(ok, false, 'يجب أن تُعيد false بلا مستخدم');
+  equal(called, false, 'لا يجوز استدعاء startQuizAttempt بلا مستخدم مسجَّل');
+});
+
+testAsync('persistAnswer(): مستخدم مسجَّل → تبدأ محاولة ثم تحفظ الإجابة بالترتيب الصحيح', async () => {
+  const calls = [];
+  const sbDLP = loadQuizViewLayer({
+    fakeAuth: fakeAuthWithUser({ id: 'u1' }),
+    fakeApi: {
+      isReady: () => true,
+      startQuizAttempt: (quizId) => { calls.push(['start', quizId]); return Promise.resolve('attempt-1'); },
+      saveQuizAnswer: (attemptId, questionId, response) => {
+        calls.push(['save', attemptId, questionId, response]); return Promise.resolve(true);
+      }
+    }
+  });
+  const ok = await sbDLP.quizView.__test.persistAnswer({ id: 'ai-q1' }, { id: 'ai-q1-1', type: 'mcq' }, 1);
+  equal(ok, true, 'يجب أن تنجح persistAnswer');
+  equal(calls.length, 2, 'يجب استدعاء start ثم save فقط');
+  equal(calls[0].join(','), 'start,ai-q1', 'أول نداء يجب أن يكون بدء المحاولة');
+  equal(calls[1].join(','), 'save,attempt-1,ai-q1-1,1', 'ثاني نداء يجب أن يحفظ الإجابة على المحاولة الصحيحة');
+});
+
+testAsync('persistAnswer(): محاولتان لسؤالين من نفس الاختبار تستخدمان نفس attemptId (بدء واحد فقط)', async () => {
+  let startCount = 0;
+  const sbDLP = loadQuizViewLayer({
+    fakeAuth: fakeAuthWithUser({ id: 'u1' }),
+    fakeApi: {
+      isReady: () => true,
+      startQuizAttempt: () => { startCount += 1; return Promise.resolve('attempt-1'); },
+      saveQuizAnswer: () => Promise.resolve(true)
+    }
+  });
+  const quiz = { id: 'ai-q1' };
+  await sbDLP.quizView.__test.persistAnswer(quiz, { id: 'ai-q1-1', type: 'mcq' }, 1);
+  await sbDLP.quizView.__test.persistAnswer(quiz, { id: 'ai-q1-2', type: 'tf' }, 'true');
+  equal(startCount, 1, 'يجب بدء محاولة واحدة فقط للاختبار الواحد بغضّ النظر عن عدد الأسئلة المُجابة');
+});
+
+testAsync('persistAnswer(): فشل الشبكة يُتجاهل بهدوء ولا يرمي استثناء', async () => {
+  const sbDLP = loadQuizViewLayer({
+    fakeAuth: fakeAuthWithUser({ id: 'u1' }),
+    fakeApi: {
+      isReady: () => true,
+      startQuizAttempt: () => Promise.resolve('attempt-1'),
+      saveQuizAnswer: () => Promise.reject(new Error('انقطاع شبكة'))
+    }
+  });
+  const ok = await sbDLP.quizView.__test.persistAnswer({ id: 'ai-q1' }, { id: 'ai-q1-1', type: 'mcq' }, 1);
+  equal(ok, false, 'يجب أن تُعيد false بهدوء عند فشل الشبكة، لا أن ترمي');
+});
+
+testAsync('persistFinish(): تستدعي finish_quiz_attempt على نفس محاولة الأسئلة المحفوظة', async () => {
+  const calls = [];
+  const sbDLP = loadQuizViewLayer({
+    fakeAuth: fakeAuthWithUser({ id: 'u1' }),
+    fakeApi: {
+      isReady: () => true,
+      startQuizAttempt: () => Promise.resolve('attempt-1'),
+      saveQuizAnswer: () => Promise.resolve(true),
+      finishQuizAttempt: (attemptId) => { calls.push(attemptId); return Promise.resolve({ score_percent: 100 }); }
+    }
+  });
+  const quiz = { id: 'ai-q1' };
+  await sbDLP.quizView.__test.persistAnswer(quiz, { id: 'ai-q1-1', type: 'mcq' }, 1);
+  const ok = await sbDLP.quizView.__test.persistFinish(quiz);
+  equal(ok, true, 'يجب أن تنجح persistFinish');
+  equal(calls.join(','), 'attempt-1', 'يجب استدعاء finish على المحاولة نفسها التي حُفظت عليها الإجابات');
+});
+
+testAsync('persistFinish(): بلا أي محاولة بدأت أصلاً (لم يُجب المستخدم على شيء) لا تستدعي أي RPC', async () => {
+  let called = false;
+  const sbDLP = loadQuizViewLayer({
+    fakeAuth: fakeAuthWithUser({ id: 'u1' }),
+    fakeApi: {
+      isReady: () => true,
+      finishQuizAttempt: () => { called = true; return Promise.resolve({}); }
+    }
+  });
+  const ok = await sbDLP.quizView.__test.persistFinish({ id: 'ai-q1' });
+  equal(ok, false, 'يجب أن تُعيد false بلا محاولة قائمة');
+  equal(called, false, 'لا يجوز استدعاء finish_quiz_attempt بلا محاولة بدأت أصلاً');
+});
+
+testAsync('discardAttempt(): يسمح ببدء محاولة خادمية جديدة بعد إعادة المحاولة (retry/clear)', async () => {
+  let startCount = 0;
+  const sbDLP = loadQuizViewLayer({
+    fakeAuth: fakeAuthWithUser({ id: 'u1' }),
+    fakeApi: {
+      isReady: () => true,
+      startQuizAttempt: () => { startCount += 1; return Promise.resolve('attempt-' + startCount); },
+      saveQuizAnswer: () => Promise.resolve(true)
+    }
+  });
+  const quiz = { id: 'ai-q1' };
+  await sbDLP.quizView.__test.persistAnswer(quiz, { id: 'ai-q1-1', type: 'mcq' }, 1);
+  sbDLP.quizView.__test.discardAttempt(quiz.id);
+  await sbDLP.quizView.__test.persistAnswer(quiz, { id: 'ai-q1-1', type: 'mcq' }, 0);
+  equal(startCount, 2, 'يجب بدء محاولة خادمية جديدة تماماً بعد discardAttempt (retry/clear)');
+});
+
 /* ------------------------------ النتيجة ------------------------------ */
 Promise.all(pendingAsync).then(() => {
 console.log('\n' + '─'.repeat(52));

@@ -10,6 +10,70 @@
   var states = {};   // quizId -> state
   var STORE_PREFIX = 'dlp.quiz.';
 
+  /* ---------------------------------------------------------------------- */
+  /* حفظ دائم عبر Supabase لمستخدم مسجَّل (Stage 2) — إضافي بحت، لا يغيّر أي   */
+  /* سلوك محلي: التصحيح والعرض يبقيان محلّيين تماماً كما كانا (DLP.quiz.grade */
+  /* يعمل على البيانات الثابتة الحالية بلا تغيير)؛ هذا فقط يُبقي نسخة دائمة   */
+  /* من كل إجابة في quiz_attempts/quiz_answers حين يكون هناك مستخدم مسجَّل     */
+  /* واتصال جاهز — بدل الاعتماد على localStorage وحده (القاعدة رقم 10).      */
+  /* أي فشل شبكة/اتصال يُتجاهل بهدوء ولا يُغيّر أي شيء في واجهة المستخدم.      */
+  /* ---------------------------------------------------------------------- */
+
+  var currentUser = null;
+  if (DLP.auth && typeof DLP.auth.onChange === 'function') {
+    DLP.auth.onChange(function (user) { currentUser = user; });
+  }
+
+  function canPersist() {
+    return !!currentUser && !!DLP.api && typeof DLP.api.isReady === 'function' && DLP.api.isReady();
+  }
+
+  var attemptPromises = {}; // quizId -> Promise<attemptId>
+
+  function ensureAttempt(quiz) {
+    if (!attemptPromises[quiz.id]) {
+      attemptPromises[quiz.id] = DLP.api.startQuizAttempt(quiz.id).catch(function (error) {
+        delete attemptPromises[quiz.id]; // يسمح بمحاولة جديدة لاحقاً بدل تجميد الفشل للأبد
+        throw error;
+      });
+    }
+    return attemptPromises[quiz.id];
+  }
+
+  /** يحوّل إجابة العميل إلى الشكل الذي تتوقعه save_quiz_answer لكل نوع سؤال
+   * (انظر supabase/migrations/003_functions.sql وDATABASE_SCHEMA.md). */
+  function toServerResponse(question, response) {
+    switch (question.type) {
+      case 'mcq':  return Number(response);
+      case 'tf':   return response === true || response === 'true';
+      case 'fill': return String(response == null ? '' : response);
+      case 'open': return String(response == null ? '' : response);
+      case 'order':
+      case 'match': return Array.isArray(response) ? response.slice() : [];
+      default: return response;
+    }
+  }
+
+  /** تُعيد Promise لتسهيل الاختبار؛ نداءات الواجهة الفعلية لا تنتظرها أبداً
+   * (fire-and-forget) — أي فشل هنا لا يجوز أن يؤخّر أو يغيّر تفاعل المستخدم. */
+  function persistAnswer(quiz, question, response) {
+    if (!canPersist()) { return Promise.resolve(false); }
+    return ensureAttempt(quiz)
+      .then(function (attemptId) { return DLP.api.saveQuizAnswer(attemptId, question.id, toServerResponse(question, response)); })
+      .then(function () { return true; })
+      .catch(function () { return false; }); // فشل بهدوء — التخزين المحلي (localStorage) يبقى fallback فورياً
+  }
+
+  function persistFinish(quiz) {
+    if (!canPersist() || !attemptPromises[quiz.id]) { return Promise.resolve(false); }
+    return attemptPromises[quiz.id]
+      .then(function (attemptId) { return DLP.api.finishQuizAttempt(attemptId); })
+      .then(function () { return true; })
+      .catch(function () { return false; });
+  }
+
+  function discardAttempt(quizId) { delete attemptPromises[quizId]; }
+
   function createState(quiz) {
     return {
       quiz: quiz,
@@ -427,13 +491,17 @@
         var action = target.dataset.quizAction;
         if (action === 'next' && state.index < state.questions.length - 1) { state.index += 1; }
         else if (action === 'prev' && state.index > 0) { state.index -= 1; }
-        else if (action === 'check' && question) { state.checked[question.id] = true; }
-        else if (action === 'finish') { state.finished = true; }
+        else if (action === 'check' && question) {
+          state.checked[question.id] = true;
+          persistAnswer(context.quiz, question, state.responses[question.id]);
+        }
+        else if (action === 'finish') { state.finished = true; persistFinish(context.quiz); }
         var wiped = false;
         if (action === 'retry' || action === 'clear') {
           var difficulty = action === 'clear' ? 'all' : state.difficulty;
           var lecture = action === 'clear' ? 'all' : state.lecture;
           clearSaved(context.quiz.id);
+          discardAttempt(context.quiz.id); // محاولة خادمية جديدة تبدأ مع إجابة جديدة، لا استكمال القديمة
           states[context.quiz.id] = createState(context.quiz);
           states[context.quiz.id].difficulty = difficulty;
           states[context.quiz.id].lecture = lecture;
@@ -495,6 +563,11 @@
 
   DLP.quizView = {
     renderSection: renderSection, renderQuiz: renderQuiz, bind: bind,
-    resetStates: resetStates, clearSaved: clearSaved
+    resetStates: resetStates, clearSaved: clearSaved,
+    /** للاختبارات فقط — لا يُستخدم من أي مكوّن آخر. */
+    __test: {
+      canPersist: canPersist, toServerResponse: toServerResponse, discardAttempt: discardAttempt,
+      persistAnswer: persistAnswer, persistFinish: persistFinish, ensureAttempt: ensureAttempt
+    }
   };
 })(typeof window !== 'undefined' ? window : globalThis);
