@@ -101,6 +101,12 @@
     paint(DLP.certificatesView.render());
   }
 
+  function renderDashboard() {
+    setTitle([t('nav.dashboard')], t('dashboard.intro'));
+    paint(DLP.dashboardView.render());
+    DLP.dashboardView.bind();
+  }
+
   /** تمرير التركيز إلى عنصر محدّد عبر ?focus= */
   function focusTarget(query) {
     if (!query || !query.focus) { return; }
@@ -139,6 +145,7 @@
     DLP.router.add('/library', renderLibrary);
     DLP.router.add('/assistant', renderAssistant);
     DLP.router.add('/certificates', renderCertificates);
+    DLP.router.add('/dashboard', renderDashboard);
     DLP.router.add('/subject/:id', renderSubject);
     DLP.router.add('/subject/:id/:section', renderSubject);
     DLP.router.setNotFound(renderNotFound);

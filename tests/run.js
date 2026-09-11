@@ -884,6 +884,117 @@ testAsync('discardAttempt(): يسمح ببدء محاولة خادمية جدي�
   equal(startCount, 2, 'يجب بدء محاولة خادمية جديدة تماماً بعد discardAttempt (retry/clear)');
 });
 
+/* -------------------- dashboard.js — لوحة الطالب (Stage 3) -------------------- */
+group('dashboard — لوحة الطالب (بلا كشف تقدّم قبل تسجيل الدخول)');
+
+/** يحمّل المنصة كاملة (بيانات + store + i18n + utils + layout) في sandbox واحد،
+ * ثم يحقن DLP.auth وهمياً قبل تحميل dashboard.js تحديداً (لأن الوحدة تقرأ
+ * DLP.auth عند التحميل مباشرة تماماً كما يحدث فعلياً في index.html). */
+function loadDashboardLayer(options) {
+  options = options || {};
+  const sandbox = {
+    console, location: { hash: '' }, addEventListener() {}, document: null
+  };
+  sandbox.window = sandbox;
+  sandbox.globalThis = sandbox;
+  vm.createContext(sandbox);
+  const platformFiles = require('./harness').FILES;
+  platformFiles.concat(['assets/js/components/layout.js']).forEach((file) => {
+    vm.runInContext(fs.readFileSync(path.join(ROOT, file), 'utf8'), sandbox, { filename: file });
+  });
+  if (options.fakeAuth) { sandbox.DLP.auth = options.fakeAuth; }
+  if (options.fakeApi) { sandbox.DLP.api = options.fakeApi; }
+  vm.runInContext(fs.readFileSync(path.join(ROOT, 'assets/js/components/dashboard.js'), 'utf8'),
+    sandbox, { filename: 'assets/js/components/dashboard.js' });
+  return sandbox.DLP;
+}
+
+test('render(): حالة "قريباً" حين DLP.auth غير متاح إطلاقاً (enabled:false اليوم)', () => {
+  const sbDLP = loadDashboardLayer({});
+  const html = sbDLP.dashboardView.render();
+  assert(html.indexOf('soon-card') !== -1, 'يجب عرض بطاقة قريباً بلا DLP.auth');
+  assert(html.indexOf('data-dashboard-action="sign-in"') === -1, 'لا يجوز عرض زر تسجيل دخول بلا اتصال');
+});
+
+test('render(): حالة "قريباً" حين DLP.auth متاح لكنه غير جاهز (isAvailable=false)', () => {
+  const sbDLP = loadDashboardLayer({ fakeAuth: { isAvailable: () => false, onChange: () => () => {} } });
+  const html = sbDLP.dashboardView.render();
+  assert(html.indexOf('soon-card') !== -1, 'يجب عرض بطاقة قريباً حين isAvailable=false');
+});
+
+test('render(): طلب تسجيل الدخول حين الاتصال جاهز لكن لا مستخدم مسجَّل', () => {
+  const sbDLP = loadDashboardLayer({
+    fakeAuth: { isAvailable: () => true, onChange: (cb) => { cb(null); return () => {}; } }
+  });
+  const html = sbDLP.dashboardView.render();
+  const strings = sbDLP.config.strings.ar;
+  assert(html.indexOf('data-dashboard-action="sign-in"') !== -1, 'زر تسجيل الدخول يجب أن يظهر');
+  assert(html.indexOf(strings['dashboard.signInPrompt']) !== -1, 'نص دعوة تسجيل الدخول يجب أن يظهر');
+  assert(html.indexOf(strings['dashboard.notAvailableHint']) === -1, 'رسالة عدم التوفر لا يجوز ظهورها والاتصال جاهز');
+});
+
+test('render(): لا يكشف أي تقدّم أو محاولات قبل تسجيل الدخول', () => {
+  const sbDLP = loadDashboardLayer({
+    fakeAuth: { isAvailable: () => true, onChange: (cb) => { cb(null); return () => {}; } }
+  });
+  const html = sbDLP.dashboardView.render();
+  assert(html.indexOf('data-dashboard-body') !== -1, 'يجب وجود حاوية المحتوى');
+  assert(html.indexOf('data-table') === -1, 'لا يجوز ظهور جدول محاولات قبل تسجيل الدخول');
+  assert(html.indexOf('progress-card') === -1, 'لا يجوز ظهور بطاقات تقدّم قبل تسجيل الدخول');
+});
+
+test('renderProgressCard(): يربط الصف بعنوان المادة الحقيقي ورابط أقسام الاختبارات', () => {
+  const sbDLP = loadDashboardLayer({});
+  const html = sbDLP.dashboardView.__test.renderProgressCard({
+    subject_id: 'ai-data', quizzes_completed: 3, best_score_percent: 87.5, last_activity_at: '2026-09-01T10:00:00+00:00'
+  });
+  assert(html.indexOf('#/subject/ai-data/quizzes') !== -1, 'الرابط يجب أن يشير لأقسام اختبارات المادة الصحيحة');
+  assert(html.indexOf('88') !== -1 || html.indexOf('87') !== -1, 'أفضل نتيجة يجب أن تظهر مقرَّبة');
+  assert(html.indexOf('3') !== -1, 'عدد الاختبارات المكتملة يجب أن يظهر');
+});
+
+test('renderProgressCard(): مادة غير معروفة (محذوفة/تغيّر معرّفها) لا تكسر العرض', () => {
+  const sbDLP = loadDashboardLayer({});
+  const html = sbDLP.dashboardView.__test.renderProgressCard({
+    subject_id: 'subject-not-found', quizzes_completed: 0, best_score_percent: null, last_activity_at: null
+  });
+  assert(html.indexOf('subject-not-found') !== -1, 'يجب عرض المعرّف نفسه كحلّ بديل بدل الانهيار');
+  assert(html.indexOf('—') !== -1, 'أفضل نتيجة غائبة يجب أن تُعرض كشرطة بديلة لا فراغ مضلّل');
+});
+
+test('renderAttemptRow(): يجد عنوان الاختبار الحقيقي من بيانات المادة', () => {
+  const sbDLP = loadDashboardLayer({});
+  const html = sbDLP.dashboardView.__test.renderAttemptRow({
+    quiz_id: 'ai-q1', started_at: '2026-09-01T08:00:00+00:00', status: 'completed', score_percent: 75
+  });
+  assert(html.indexOf('اختبار المادة') !== -1, 'يجب ظهور عنوان الاختبار الحقيقي لا معرّفه الخام');
+  assert(html.indexOf('75') !== -1, 'النتيجة يجب أن تظهر لمحاولة مكتملة');
+});
+
+test('renderAttemptRow(): محاولة قيد التنفيذ لا تعرض نتيجة مضلّلة', () => {
+  const sbDLP = loadDashboardLayer({});
+  const html = sbDLP.dashboardView.__test.renderAttemptRow({
+    quiz_id: 'ai-q1', started_at: '2026-09-01T08:00:00+00:00', status: 'in_progress', score_percent: null
+  });
+  assert(html.indexOf('—') !== -1, 'المحاولة غير المكتملة يجب أن تُعرض بشرطة بديلة للنتيجة لا رقماً');
+});
+
+test('findQuizContext(): يعيد null لمعرّف اختبار غير موجود بدل رمي استثناء', () => {
+  const sbDLP = loadDashboardLayer({});
+  equal(sbDLP.dashboardView.__test.findQuizContext('quiz-not-found'), null, 'يجب أن تُعيد null بهدوء');
+});
+
+test('formatTimestamp(): يحوّل طابعاً زمنياً كاملاً (timestamptz) إلى تاريخ مقروء', () => {
+  const sbDLP = loadDashboardLayer({});
+  const formatted = sbDLP.dashboardView.__test.formatTimestamp('2026-09-01T08:00:00+00:00');
+  assert(formatted.indexOf('2026') !== -1, 'يجب أن يحتوي التاريخ المنسَّق على السنة');
+});
+
+test('formatTimestamp(): قيمة فارغة/null لا تكسر التنسيق', () => {
+  const sbDLP = loadDashboardLayer({});
+  equal(sbDLP.dashboardView.__test.formatTimestamp(null), '', 'يجب أن تُعيد نصاً فارغاً بهدوء');
+});
+
 /* ------------------------------ النتيجة ------------------------------ */
 Promise.all(pendingAsync).then(() => {
 console.log('\n' + '─'.repeat(52));

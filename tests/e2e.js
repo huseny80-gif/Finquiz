@@ -437,6 +437,28 @@ function group(name) { console.log('\n▶ ' + name); }
     links.forEach((href) => assert(!/example\.com|#$|javascript:/i.test(href), 'رابط وهمي: ' + href));
   });
 
+  group('لوحة الطالب (Dashboard)');
+
+  await test('رابط لوحتي موجود في الشريط الجانبي وينقل لمسار /dashboard', async () => {
+    await page.goto(base, { waitUntil: 'domcontentloaded' });
+    await page.click('a.side-link[href="#/dashboard"]');
+    await page.waitForSelector('.soon-card', { timeout: 3000 });
+    assert(page.url().includes('#/dashboard'), 'لم ينتقل لمسار لوحة الطالب');
+  });
+
+  await test('لوحة الطالب تعرض حالة "قريباً" ما دام الاتصال الحي غير مفعَّل', async () => {
+    await page.goto(base + '#/dashboard', { waitUntil: 'domcontentloaded' });
+    const text = await page.textContent('#main');
+    assert(text.includes('قريباً') || text.includes('Coming soon'), 'لم تظهر حالة عدم التوفر المتوقعة');
+    assert(!(await page.$('[data-dashboard-action="sign-in"]')), 'زر تسجيل الدخول لا يجوز ظهوره والاتصال معطَّل');
+  });
+
+  await test('شريط المسار في لوحة الطالب صحيح', async () => {
+    const crumbs = await page.$$eval('.breadcrumbs a, .breadcrumbs span', (els) => els.map((e) => e.textContent.trim()));
+    assert(crumbs.length >= 2, 'شريط المسار ناقص');
+    assert(crumbs[crumbs.length - 1].length > 0, 'العنصر الأخير في شريط المسار فارغ');
+  });
+
   group('التذييل والروابط');
 
   await test('التذييل يحتوي روابط المواد ومن نحن وحقوق النشر', async () => {
@@ -551,7 +573,7 @@ function group(name) { console.log('\n▶ ' + name); }
 
   await test('لا توجد أخطاء في الـ Console عبر كل الصفحات', async () => {
     consoleErrors.length = 0;
-    const urls = [base, base + '#/about', base + '#/search?q=المخاطر'];
+    const urls = [base, base + '#/about', base + '#/search?q=المخاطر', base + '#/dashboard'];
     SUBJECTS.forEach((id) => SECTIONS.forEach((s) => urls.push(base + '#/subject/' + id + '/' + s)));
     for (const url of urls) { await page.goto(url, { waitUntil: 'domcontentloaded' }); }
     assert(consoleErrors.length === 0, 'أخطاء: ' + consoleErrors.slice(0, 5).join(' | '));
