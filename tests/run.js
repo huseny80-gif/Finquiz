@@ -3,6 +3,7 @@
 
 const fs = require('fs');
 const path = require('path');
+const vm = require('vm');
 const { loadPlatform, ROOT } = require('./harness');
 
 let passed = 0;
@@ -12,6 +13,15 @@ const failures = [];
 function test(name, fn) {
   try { fn(); passed += 1; console.log('  ✓ ' + name); }
   catch (error) { failed += 1; failures.push({ name, error }); console.log('  ✗ ' + name + '\n      ' + error.message); }
+}
+const pendingAsync = [];
+function testAsync(name, fn) {
+  pendingAsync.push(
+    Promise.resolve().then(fn).then(
+      () => { passed += 1; console.log('  ✓ ' + name); },
+      (error) => { failed += 1; failures.push({ name, error }); console.log('  ✗ ' + name + '\n      ' + error.message); }
+    )
+  );
 }
 function group(name) { console.log('\n▶ ' + name); }
 function assert(condition, message) { if (!condition) { throw new Error(message || 'التوقع لم يتحقق'); } }
@@ -526,7 +536,110 @@ test('لا توجد أسرار أو مفاتيح في ملفات المشروع'
   });
 });
 
+/* ------------------- طبقة Supabase (Stage 1: supabase.js/api.js/auth.js) ------------------- */
+group('طبقة Supabase — الاتصال والتصفح بلا حساب');
+
+/** يحمّل data/config/supabase.js + core/supabase.js + core/api.js + core/auth.js في sandbox
+ * معزول تماماً عن باقي المنصة (لا علاقة بـ loadPlatform)، مع إمكانية حقن مكتبة عميل وهمية
+ * أو تعطيلها، لاختبار سلوك الـ fallback بدقّة. */
+function loadSupabaseLayer(options) {
+  options = options || {};
+  const sandbox = {
+    console, location: { origin: 'https://example.test', hash: '', pathname: '/' },
+    addEventListener() {}, document: null
+  };
+  sandbox.window = sandbox;
+  sandbox.globalThis = sandbox;
+  if (options.fakeClientLib) { sandbox.supabase = options.fakeClientLib; }
+  vm.createContext(sandbox);
+  const files = ['data/config/supabase.js', 'assets/js/core/supabase.js',
+    'assets/js/core/api.js', 'assets/js/core/auth.js'];
+  files.forEach((file) => {
+    let code = fs.readFileSync(path.join(ROOT, file), 'utf8');
+    if (file === 'data/config/supabase.js' && options.configOverride) {
+      code += `\nObject.assign(DLP.config.supabase, ${JSON.stringify(options.configOverride)});`;
+    }
+    vm.runInContext(code, sandbox, { filename: file });
+  });
+  return sandbox.DLP;
+}
+
+test('إعداد Supabase لا يحتوي مفتاح service_role مطلقاً', () => {
+  const content = fs.readFileSync(path.join(ROOT, 'data/config/supabase.js'), 'utf8');
+  assert(!/service_role/i.test(content), 'وُجد ذكر لـ service_role في ملف إعداد أمامي');
+});
+
+test('بلا مكتبة عميل محمَّلة: العميل null والموقع لا ينهار (fallback فوري)', () => {
+  const DLP = loadSupabaseLayer({});
+  equal(DLP.supabaseClient, null, 'يجب ألا يوجد عميل بلا مكتبة');
+  equal(DLP.supabaseReady, false, 'supabaseReady يجب أن تكون false');
+});
+
+test('enabled:false يمنع إنشاء العميل حتى مع وجود مكتبة ومفاتيح صحيحة', () => {
+  const DLP = loadSupabaseLayer({
+    configOverride: { enabled: false },
+    fakeClientLib: { createClient: () => ({ fake: true }) }
+  });
+  equal(DLP.supabaseClient, null, 'يجب ألا يوجد عميل عند enabled:false');
+});
+
+test('مفاتيح ناقصة (بلا url) تمنع إنشاء العميل بهدوء', () => {
+  const DLP = loadSupabaseLayer({
+    configOverride: { url: '' },
+    fakeClientLib: { createClient: () => ({ fake: true }) }
+  });
+  equal(DLP.supabaseClient, null, 'يجب ألا يوجد عميل بلا url');
+});
+
+test('مكتبة عميل + مفاتيح صحيحة → عميل جاهز فعلاً', () => {
+  let calledWith = null;
+  const DLP = loadSupabaseLayer({
+    fakeClientLib: {
+      createClient(url, key) { calledWith = [url, key]; return { fake: true }; }
+    }
+  });
+  equal(DLP.supabaseReady, true, 'supabaseReady يجب أن تكون true');
+  assert(DLP.supabaseClient && DLP.supabaseClient.fake, 'العميل المُعاد غير صحيح');
+  assert(calledWith[0].indexOf('supabase.co') !== -1, 'لم يُمرَّر رابط المشروع الصحيح');
+  assert(!/service_role/i.test(calledWith[1] || ''), 'مفتاح service_role مُرِّر للعميل!');
+});
+
+test('api.isReady() تعكس حالة العميل بدقّة (true/false)', () => {
+  const withoutClient = loadSupabaseLayer({});
+  equal(withoutClient.api.isReady(), false, 'isReady يجب أن تكون false بلا عميل');
+
+  const withClient = loadSupabaseLayer({ fakeClientLib: { createClient: () => ({ fake: true }) } });
+  equal(withClient.api.isReady(), true, 'isReady يجب أن تكون true مع عميل');
+});
+
+testAsync('api.fetchAllContent() ترفض بهدوء بلا عميل (بلا استثناء متزامن يكسر الصفحة)', async () => {
+  const DLP = loadSupabaseLayer({});
+  let rejected = false;
+  await DLP.api.fetchAllContent().catch(() => { rejected = true; });
+  assert(rejected, 'كان يجب أن ترفض fetchAllContent بلا عميل');
+});
+
+testAsync('التصفح العام يبقى ممكناً بلا حساب: auth.getUser() تُعيد null دون رمي', async () => {
+  const DLP = loadSupabaseLayer({});
+  const user = await DLP.auth.getUser();
+  equal(user, null, 'يجب أن يكون المستخدم null بلا اتصال/تسجيل دخول');
+});
+
+testAsync('auth.signInWithGoogle() ترفض برسالة واضحة حين لا يوجد اتصال', async () => {
+  const DLP = loadSupabaseLayer({});
+  let message = null;
+  await DLP.auth.signInWithGoogle().catch((error) => { message = error.message; });
+  assert(message && message.length > 0, 'يجب أن ترفض signInWithGoogle برسالة واضحة');
+});
+
+testAsync('auth.signOut() لا ترمي حتى بلا عميل (لا حساب لتسجيل خروج منه أصلاً)', async () => {
+  const DLP = loadSupabaseLayer({});
+  await DLP.auth.signOut();
+  assert(true, 'اكتملت بلا استثناء');
+});
+
 /* ------------------------------ النتيجة ------------------------------ */
+Promise.all(pendingAsync).then(() => {
 console.log('\n' + '─'.repeat(52));
 console.log(`النتيجة: ${passed} نجحت / ${failed} فشلت — الإجمالي ${passed + failed}`);
 if (failed) {
@@ -535,3 +648,4 @@ if (failed) {
   process.exit(1);
 }
 console.log('كل الاختبارات نجحت ✓');
+});

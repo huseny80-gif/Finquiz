@@ -13,25 +13,33 @@
   `course2.sql`)، مُطبَّقة ومُتحقَّق من مطابقة الأعداد.
 - **لم يتغيّر أي ملف في `assets/js/*` أو `data/*` أو `index.html`.**
 
-## المرحلة 1 — طبقة الوصول (لم تبدأ بعد)
+## المرحلة 1 — طبقة الوصول
 
-1. `assets/js/core/supabase.js` — تهيئة عميل Supabase (SDK مُحمَّل محلياً من `assets/vendor/`
-   وليس من CDN، بسبب `script-src 'self'` في CSP)، بمفتاح `anon`/`publishable` فقط، مقروء من
-   إعداد يُحقن وقت البناء أو من عنصر `<meta>`/كائن تهيئة — **لا سرّ في الكود المصدري**.
-2. `assets/js/core/api.js` — الطبقة الوحيدة المسموح لها بمخاطبة Supabase مباشرة (queries وRPC).
+**الحالة: البنود 1-4 منجزة ومُختبرة (59/59 وحدة + 60/60 متصفح، صفر تراجع). البندان 5-6 لم يبدآ بعد.**
+
+1. ✅ `assets/js/core/supabase.js` — تهيئة عميل Supabase (SDK مُحمَّل محلياً من `assets/vendor/`
+   وليس من CDN، بسبب `script-src 'self'` في CSP)، بمفتاح `anon`/`publishable` فقط من
+   `data/config/supabase.js` — **لا سرّ في الكود المصدري**. يسقط بهدوء (`null`) بلا مكتبة/مفاتيح/
+   اتصال، دون رمي أي استثناء.
+2. ✅ `assets/js/core/api.js` — الطبقة الوحيدة المسموح لها بمخاطبة Supabase مباشرة (queries وRPC).
    المكوّنات (`components/*.js`) يجب ألا تستورد `supabase.js` مباشرة أبداً — فقط عبر `api.js`.
-3. `assets/js/core/auth.js` — تسجيل دخول Google عبر Supabase Auth (`signInWithOAuth`)، مع إبقاء
+   تحوي `fetchAllContent()` (تبني شكل `DLP.data` نفسه) ودوال RPC الأربع (`startQuizAttempt`,
+   `saveQuizAnswer`, `finishQuizAttempt`, `revealQuestionAnswer`) لاستخدامها في المرحلة 2. كل
+   دالة تُعيد Promise وتُرفض بهدوء بلا اتصال، لا تطرح استثناءً متزامناً أبداً.
+3. ✅ `assets/js/core/auth.js` — تسجيل دخول Google عبر Supabase Auth (`signInWithOAuth`)، مع إبقاء
    التصفح العام (المحتوى، الاختبارات، البحث) يعمل بلا حساب؛ الدخول مطلوب فقط لحفظ نتيجة اختبار.
-4. تعديل `index.html`: إضافة نطاق مشروع Supabase إلى `connect-src` في الـ CSP، وسكربت الـ SDK
-   المحلي إلى `script-src 'self'` (يبقى `'self'` لأنه ملف محلي)، وإضافة `<script>` tags الثلاثة
-   الجديدة بعد `utils.js`/`i18n.js` وقبل `store.js`.
-5. تعديل `assets/js/core/store.js`: إضافة `DATA_SOURCE` (`'database'` أو الافتراضي الحالي) و
+4. ✅ تعديل `index.html`: أُضيف نطاق مشروع Supabase إلى `connect-src` في الـ CSP، وسكربت المكتبة
+   المحلي (يبقى `script-src 'self'` لأنه ملف محلي تحت `assets/vendor/`)، و`<script>` tags
+   الثلاثة الجديدة + `data/config/supabase.js` في مكانهما المناسب.
+5. ⬜ تعديل `assets/js/core/store.js`: إضافة `DATA_SOURCE` (`'database'` أو الافتراضي الحالي) و
    `hydrate()` غير متزامنة تملأ `DLP.data`/`DLP.subjectOrder` من `api.js` عند نجاح الاتصال، وإلا
    **تسقط تلقائياً** على `<script>` tags الثابتة الحالية دون أي تغيير في توقيع `subjects()`,
    `getSubject()`, `list()`, `stats()`, `latestUpdates()`, `findQuiz()` — Adapter pattern كامل.
-6. تعديل `assets/js/app.js`: استدعاء `await DLP.store.hydrate()` مرة واحدة قبل `DLP.router.start()`.
-7. اختبارات جديدة (انظر القائمة الكاملة في §"الاختبارات المطلوبة" أدناه) تُضاف إلى `tests/`
-   وتُدمَج في `npm test`/`npm run test:e2e` دون كسر الاختبارات الحالية.
+   **لم يبدأ بعد.**
+6. ⬜ تعديل `assets/js/app.js`: استدعاء `await DLP.store.hydrate()` مرة واحدة قبل
+   `DLP.router.start()`. **لم يبدأ بعد.**
+7. جزء من اختبارات §"الاختبارات المطلوبة" أدناه (البند 1) أُنجز مع البنود 1-4 أعلاه؛ الباقي
+   (2-15) يتطلب البندين 5-6 أولاً.
 
 ## المرحلة 2 — محرّك الاختبار الحقيقي
 
