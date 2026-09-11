@@ -7,6 +7,7 @@
     "start": "node scripts/serve.js",
     "test": "node tests/run.js",
     "test:e2e": "node tests/e2e.js",
+    "test:e2e:live": "node tests/e2e.live.js",
     "validate": "node scripts/validate.js",
     "build": "node scripts/validate.js && node tests/run.js"
   },
