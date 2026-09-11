@@ -345,9 +345,13 @@
   }
 
   /* -------------------------------------------------------------------- */
-  /* سقالة الإدارة (Stage 4) — قراءة فقط. الكتابة تبقى عبر RLS مباشرة        */
-  /* (content_write_admin/questions_write_admin/... في 002_rls.sql) في مرحلة */
-  /* لاحقة؛ لا نماذج تحرير/حذف هنا بعد.                                     */
+  /* سقالة الإدارة — قراءة + كتابة كاملة الآن (Phase D). كل دوال الكتابة       */
+  /* أدناه لا تحمل أي حماية خاصة بها — الحماية الفعلية الوحيدة هي سياسات      */
+  /* RLS *_write_admin الموجودة فعلاً (002_rls.sql): is_admin_or_instructor() */
+  /* تُقيَّم على القاعدة لكل عملية INSERT/UPDATE/DELETE بصرف النظر عمّا يرسله  */
+  /* العميل. أي مستخدم غير admin/instructor سيتلقّى 42501 من القاعدة نفسها    */
+  /* لو حاول استدعاء أياً من هذه الدوال مباشرة (مثلاً من console المتصفح) —   */
+  /* isAdminOrInstructor() في الواجهة تحسين تجربة استخدام فقط، لا حدّ أمان.   */
   /* -------------------------------------------------------------------- */
 
   /** فحص دور واجهي بحت (تحسين تجربة استخدام) — الحماية الفعلية دائماً في RLS
@@ -368,6 +372,116 @@
     });
   }
 
+  /** الجداول التي تحمل سياسة *_write_admin فعلاً (002_rls.sql) — أي طلب كتابة
+   * لجدول خارج هذه القائمة يُرفَض هنا فوراً بلا استدعاء شبكة، بدل الاعتماد على
+   * رفض القاعدة وحده (خطأ برمجي محلي أوضح من 42501 بعيد). */
+  var ADMIN_WRITABLE_TABLES = ['subjects', 'lectures', 'summaries', 'assignments', 'quizzes',
+    'references', 'resources', 'updates', 'files', 'questions',
+    'question_options', 'question_items', 'question_pairs'];
+
+  function assertWritable(table) {
+    if (ADMIN_WRITABLE_TABLES.indexOf(table) === -1) {
+      throw new Error('جدول غير مسموح بالكتابة عبر طبقة الإدارة: ' + table);
+    }
+  }
+
+  /** يجلب صفوف جدول إداري مباشرةً (بمعزل عن DLP.data/hydrate) — تُستخدَم من
+   * صفحات لوحة الإدارة لعرض أحدث نسخة من القاعدة فور كل عملية كتابة، بدل
+   * الاعتماد على hydrate() (تُنعِش كل المنصة مرة واحدة عند التحميل فقط، لا
+   * تصلح كآلية تحديث فوري بعد كل تعديل إداري صغير). filters كائن {عمود: قيمة}. */
+  function adminList(table, filters, orderColumn) {
+    return requireClient().then(function (c) {
+      var query = c.from(table).select('*');
+      Object.keys(filters || {}).forEach(function (key) { query = query.eq(key, filters[key]); });
+      if (orderColumn) { query = query.order(orderColumn); }
+      return query.then(unwrap);
+    });
+  }
+
+  /** إدراج صفّ جديد، يعيد الصفّ كما خُزِّن فعلياً (بما فيه القيم الافتراضية
+   * مثل id/created_at التي تولّدها القاعدة). */
+  function adminInsert(table, data) {
+    assertWritable(table);
+    return requireClient().then(function (c) {
+      return c.from(table).insert(data).select().then(unwrap).then(function (rows) {
+        return (rows && rows[0]) || null;
+      });
+    });
+  }
+
+  /** تحديث جزئي لصفّ موجود بمعرّفه، يعيد الصفّ بعد التحديث. */
+  function adminUpdate(table, id, patch) {
+    assertWritable(table);
+    return requireClient().then(function (c) {
+      return c.from(table).update(patch).eq('id', id).select().then(unwrap).then(function (rows) {
+        return (rows && rows[0]) || null;
+      });
+    });
+  }
+
+  function adminDelete(table, id) {
+    assertWritable(table);
+    return requireClient().then(function (c) {
+      return c.from(table).delete().eq('id', id).then(unwrap);
+    });
+  }
+
+  /** تغيير الحالة فقط (draft|published|archived) — غلاف رقيق فوق adminUpdate
+   * لتوضيح القصد في نداءات الواجهة. */
+  function adminSetStatus(table, id, status) {
+    return adminUpdate(table, id, { status: status });
+  }
+
+  /** يتحقق هل توجد صفوف في childTable تشير إلى id عبر fkColumn — يُستخدم قبل
+   * حذف مادة/محاضرة/اختبار لعرض تحذير واضح بدل حذف صامت يكسر علاقات (قاعدة
+   * الحذف: "لا تسمح بحذف مادة مرتبطة بمحتوى دون تحذير واضح"). لا يمنع الحذف
+   * بنفسه — يعيد فقط العدد ليقرّر المستدعي (الواجهة) كيف يُحذِّر المستخدم. */
+  function adminCountReferences(childTable, fkColumn, id) {
+    return requireClient().then(function (c) {
+      return c.from(childTable).select('id', { count: 'exact', head: true }).eq(fkColumn, id)
+        .then(function (result) {
+          if (result.error) { throw result.error; }
+          return result.count || 0;
+        });
+    });
+  }
+
+  /** يكتب حقل order لكل معرّف بترتيب المصفوفة (1-based) — لإعادة ترتيب
+   * المواد/الأسئلة عبر أزرار "تحريك للأعلى/الأسفل" في لوحة الإدارة. */
+  function adminReorder(table, orderColumn, orderedIds) {
+    assertWritable(table);
+    return requireClient().then(function (c) {
+      return Promise.all(orderedIds.map(function (id, index) {
+        var patch = {};
+        patch[orderColumn] = index + 1;
+        return c.from(table).update(patch).eq('id', id).then(unwrap);
+      }));
+    });
+  }
+
+  /** استبدال كامل لصفوف فرعية لسؤال واحد (question_options/items/pairs):
+   * حذف كل الصفوف الحالية لهذا السؤال ثم إدراج القائمة الجديدة بأكملها.
+   * ملاحظة صريحة: هذا حذف+إدراج منفصلان لا معاملة SQL واحدة (طبقة REST من
+   * العميل لا تدعم معاملات متعددة الاستعلامات) — مقبول لاستخدام إداري
+   * تسلسلي (مشرف واحد يحرر سؤالاً واحداً في كل مرة)، وغير آمن ضد تعديلين
+   * متزامنين لنفس السؤال بالضبط؛ هذا خطر مقبول لنطاق الاستخدام الحالي (لوحة
+   * إدارة داخلية بعدد مشرفين محدود)، لا افتراضاً يُخفى. */
+  function adminReplaceQuestionChildren(childTable, questionId, rows) {
+    assertWritable(childTable);
+    return requireClient().then(function (c) {
+      return c.from(childTable).delete().eq('question_id', questionId).then(unwrap).then(function () {
+        if (!rows || !rows.length) { return []; }
+        var withQid = rows.map(function (row) {
+          var copy = {};
+          for (var key in row) { if (row.hasOwnProperty(key)) { copy[key] = row[key]; } }
+          copy.question_id = questionId;
+          return copy;
+        });
+        return c.from(childTable).insert(withQid).select().then(unwrap);
+      });
+    });
+  }
+
   DLP.api = {
     isReady: isReady,
     fetchAllContent: fetchAllContent,
@@ -381,7 +495,15 @@
     fetchStudentProgress: fetchStudentProgress,
     fetchMyAttempts: fetchMyAttempts,
     isAdminOrInstructor: isAdminOrInstructor,
-    fetchQuizQuestionsAdmin: fetchQuizQuestionsAdmin
+    fetchQuizQuestionsAdmin: fetchQuizQuestionsAdmin,
+    adminList: adminList,
+    adminInsert: adminInsert,
+    adminUpdate: adminUpdate,
+    adminDelete: adminDelete,
+    adminSetStatus: adminSetStatus,
+    adminCountReferences: adminCountReferences,
+    adminReorder: adminReorder,
+    adminReplaceQuestionChildren: adminReplaceQuestionChildren
   };
 
   if (typeof module !== 'undefined' && module.exports) { module.exports = DLP.api; }

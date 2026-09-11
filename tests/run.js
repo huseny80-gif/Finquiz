@@ -846,6 +846,156 @@ testAsync('fetchAllContent(): يفشل بوضوح لو طلب select(*) خطأً
   assert(rejected, 'select(*) على جدول محجوب الأعمدة يجب أن يفشل — إن لم يفشل فالمحاكي لا يختبر شيئاً حقيقياً');
 });
 
+/* -------------------- api.js: طبقة الكتابة الإدارية (Phase D) -------------------- */
+/* محاكي بسيط لعمليات insert/update/delete/select(count) — لا علاقة له بمحاكي   */
+/* قيود الأعمدة أعلاه (fakeColumnCheckingClient) لأن جداول الكتابة هنا لا تحمل  */
+/* قيوداً على الأعمدة، فقط على الصفوف (RLS)، وهذا خارج نطاق ما تختبره هذه       */
+/* الطبقة أصلاً (الحماية الفعلية تُختبَر على القاعدة الحية لا هنا). */
+
+function fakeAdminWriteClient(seedRows) {
+  const calls = { insert: [], update: [], delete: [] };
+  function builder(table) {
+    if (!seedRows[table]) { seedRows[table] = []; }
+    let pendingOp = null;
+    const filters = [];
+    let wantCount = false;
+    let orderCol = null;
+    const b = {
+      insert(data) {
+        pendingOp = { type: 'insert', rows: Array.isArray(data) ? data : [data] };
+        calls.insert.push([table, pendingOp.rows]);
+        return b;
+      },
+      update(patch) {
+        pendingOp = { type: 'update', patch };
+        calls.update.push([table, patch]);
+        return b;
+      },
+      delete() {
+        pendingOp = { type: 'delete' };
+        calls.delete.push([table]);
+        return b;
+      },
+      eq(col, val) { filters.push([col, val]); return b; },
+      select(cols, opts) { if (opts && opts.count) { wantCount = true; } return b; },
+      order(col) { orderCol = col; return b; },
+      then(onFulfilled, onRejected) {
+        const rows = seedRows[table];
+        const matches = (row) => filters.every(([c, v]) => row[c] === v);
+        let result;
+        if (pendingOp && pendingOp.type === 'insert') {
+          const inserted = pendingOp.rows.map((data, i) => {
+            const row = Object.assign({ id: data.id || (table + '-gen-' + (rows.length + i + 1)) }, data);
+            rows.push(row);
+            return row;
+          });
+          result = { data: inserted, error: null };
+        } else if (pendingOp && pendingOp.type === 'update') {
+          const matched = rows.filter(matches);
+          matched.forEach((row) => Object.assign(row, pendingOp.patch));
+          result = { data: matched, error: null };
+        } else if (pendingOp && pendingOp.type === 'delete') {
+          const matched = rows.filter(matches);
+          seedRows[table] = rows.filter((row) => matched.indexOf(row) === -1);
+          result = { data: matched, error: null };
+        } else {
+          let matched = rows.filter(matches);
+          if (orderCol) { matched = matched.slice().sort((a, c) => (a[orderCol] > c[orderCol] ? 1 : -1)); }
+          result = wantCount ? { data: null, error: null, count: matched.length } : { data: matched, error: null };
+        }
+        return Promise.resolve(result).then(onFulfilled, onRejected);
+      }
+    };
+    return b;
+  }
+  return { from: builder, __calls: calls };
+}
+
+testAsync('adminInsert()/adminUpdate()/adminDelete(): تعمل على جدول مسموح وتعيد الصفّ الفعلي', async () => {
+  const seedRows = { subjects: [] };
+  const client = fakeAdminWriteClient(seedRows);
+  const sbDLP = loadSupabaseLayer({ configOverride: { enabled: true }, fakeClientLib: { createClient: () => client } });
+
+  const created = await sbDLP.api.adminInsert('subjects', { id: 's1', title: 'مادة جديدة', status: 'draft' });
+  equal(created.id, 's1', 'الصفّ المُدرَج يجب أن يُعاد كما خُزِّن');
+  equal(seedRows.subjects.length, 1, 'يجب أن يُخزَّن الصفّ فعلياً');
+
+  const updated = await sbDLP.api.adminUpdate('subjects', 's1', { status: 'published' });
+  equal(updated.status, 'published', 'التحديث يجب أن يُطبَّق ويُعاد في النتيجة');
+
+  await sbDLP.api.adminDelete('subjects', 's1');
+  equal(seedRows.subjects.length, 0, 'الحذف يجب أن يزيل الصفّ فعلياً');
+});
+
+testAsync('adminInsert(): يرفض جدولاً غير مسموح بالكتابة بلا أي استدعاء شبكة', async () => {
+  const client = fakeAdminWriteClient({});
+  const sbDLP = loadSupabaseLayer({ configOverride: { enabled: true }, fakeClientLib: { createClient: () => client } });
+  let threw = false;
+  try { await sbDLP.api.adminInsert('quiz_attempts', { id: 'x' }); } catch (e) { threw = true; }
+  assert(threw, 'جدول خارج ADMIN_WRITABLE_TABLES يجب أن يُرفَض محلياً فوراً');
+  equal(client.__calls.insert.length, 0, 'لا يجوز أن يصل أي نداء فعلي للعميل لجدول مرفوض');
+});
+
+testAsync('adminSetStatus(): غلاف رقيق فوق adminUpdate لحقل status فقط', async () => {
+  const seedRows = { updates: [{ id: 'u1', status: 'draft' }] };
+  const client = fakeAdminWriteClient(seedRows);
+  const sbDLP = loadSupabaseLayer({ configOverride: { enabled: true }, fakeClientLib: { createClient: () => client } });
+  const result = await sbDLP.api.adminSetStatus('updates', 'u1', 'archived');
+  equal(result.status, 'archived', 'adminSetStatus يجب أن يُحدِّث status فقط');
+});
+
+testAsync('adminCountReferences(): يعيد عدد الصفوف المرتبطة بمعرّف عبر عمود fk — لا يحذف شيئاً', async () => {
+  const seedRows = { lectures: [{ id: 'l1', subject_id: 's1' }, { id: 'l2', subject_id: 's1' }, { id: 'l3', subject_id: 's2' }] };
+  const client = fakeAdminWriteClient(seedRows);
+  const sbDLP = loadSupabaseLayer({ configOverride: { enabled: true }, fakeClientLib: { createClient: () => client } });
+  const count = await sbDLP.api.adminCountReferences('lectures', 'subject_id', 's1');
+  equal(count, 2, 'يجب أن يعدّ فقط المحاضرات المرتبطة بالمادة s1');
+  equal(seedRows.lectures.length, 3, 'العدّ يجب ألا يحذف أو يغيّر أي صفّ');
+});
+
+testAsync('adminList(): يجلب صفوف جدول مباشرة بفلاتر وترتيب، بمعزل عن DLP.data/hydrate', async () => {
+  const seedRows = {
+    lectures: [
+      { id: 'l2', subject_id: 's1', number: 2 }, { id: 'l1', subject_id: 's1', number: 1 },
+      { id: 'l9', subject_id: 's2', number: 1 }
+    ]
+  };
+  const client = fakeAdminWriteClient(seedRows);
+  const sbDLP = loadSupabaseLayer({ configOverride: { enabled: true }, fakeClientLib: { createClient: () => client } });
+  const rows = await sbDLP.api.adminList('lectures', { subject_id: 's1' }, 'id');
+  equal(rows.length, 2, 'يجب أن يُصفَّى بحسب subject_id فقط');
+  equal(rows.map((r) => r.id).join(','), 'l1,l2', 'يجب أن يُرتَّب حسب العمود المطلوب');
+});
+
+testAsync('adminReorder(): يكتب حقل order بترتيب المصفوفة المُمرَّرة (1-based)', async () => {
+  const seedRows = { subjects: [{ id: 'a', order: 3 }, { id: 'b', order: 1 }, { id: 'c', order: 2 }] };
+  const client = fakeAdminWriteClient(seedRows);
+  const sbDLP = loadSupabaseLayer({ configOverride: { enabled: true }, fakeClientLib: { createClient: () => client } });
+  await sbDLP.api.adminReorder('subjects', 'order', ['b', 'c', 'a']);
+  const byId = {}; seedRows.subjects.forEach((r) => { byId[r.id] = r.order; });
+  equal(byId.b, 1, 'b يجب أن تصبح الأولى'); equal(byId.c, 2, 'c الثانية'); equal(byId.a, 3, 'a الثالثة');
+});
+
+testAsync('adminReplaceQuestionChildren(): يحذف كل الصفوف القديمة لسؤال ثم يُدرج الجديدة فقط', async () => {
+  const seedRows = {
+    question_options: [
+      { id: 'o1', question_id: 'q1', label: 'قديم1' },
+      { id: 'o2', question_id: 'q1', label: 'قديم2' },
+      { id: 'o3', question_id: 'q2', label: 'سؤال آخر — يجب ألا يُمَس' }
+    ]
+  };
+  const client = fakeAdminWriteClient(seedRows);
+  const sbDLP = loadSupabaseLayer({ configOverride: { enabled: true }, fakeClientLib: { createClient: () => client } });
+  await sbDLP.api.adminReplaceQuestionChildren('question_options', 'q1', [
+    { position: 0, label: 'جديد1' }, { position: 1, label: 'جديد2' }, { position: 2, label: 'جديد3' }
+  ]);
+  const forQ1 = seedRows.question_options.filter((r) => r.question_id === 'q1');
+  const forQ2 = seedRows.question_options.filter((r) => r.question_id === 'q2');
+  equal(forQ1.length, 3, 'يجب أن تحل 3 صفوف جديدة محل الصفّين القديمين لهذا السؤال تحديداً');
+  assert(forQ1.every((r) => r.label.indexOf('جديد') === 0), 'كل الصفوف الجديدة يجب أن تحمل بيانات الاستبدال');
+  equal(forQ2.length, 1, 'سؤال آخر غير معنيّ يجب ألا يتأثر إطلاقاً');
+});
+
 /* -------------------- store.hydrate() — الاستبدال الذرّي وسقوط fallback -------------------- */
 
 /** يحمّل نسخة معزولة من core/store.js مع بيانات ثابتة لمادة واحدة فقط، ليمكن
@@ -1525,6 +1675,9 @@ function loadAdminLayer(componentFile, options) {
   platformFiles.concat(['assets/js/components/layout.js']).forEach((file) => {
     vm.runInContext(fs.readFileSync(path.join(ROOT, file), 'utf8'), sandbox, { filename: file });
   });
+  ['assets/js/components/admin/shared.js', 'assets/js/components/admin/crud-page.js'].forEach((file) => {
+    vm.runInContext(fs.readFileSync(path.join(ROOT, file), 'utf8'), sandbox, { filename: file });
+  });
   if (options.fakeAuth) { sandbox.DLP.auth = options.fakeAuth; }
   if (options.fakeApi) { sandbox.DLP.api = options.fakeApi; }
   vm.runInContext(fs.readFileSync(path.join(ROOT, componentFile), 'utf8'), sandbox, { filename: componentFile });
@@ -1545,6 +1698,36 @@ test('adminView.render(): دعوة تسجيل الدخول حين الاتصال
   const html = sbDLP.adminView.render();
   assert(html.indexOf('data-admin-action="sign-in"') !== -1, 'زر تسجيل الدخول يجب أن يظهر');
   assert(html.indexOf('data-table') === -1, 'لا يجوز ظهور أي جدول قبل تسجيل الدخول');
+});
+
+test('adminView.__test.collectSubjectPayload(): يبني payload صحيحاً عند الإنشاء والتعديل', () => {
+  const sbDLP = loadAdminLayer('assets/js/components/admin/index.js', {});
+  const newForm = { elements: [
+    { name: 'id', value: 'new-subject' }, { name: 'title', value: 'مادة' },
+    { name: 'short_title', value: 'م' }, { name: 'icon', value: '📘' },
+    { name: 'accent', value: '#000' }, { name: 'description', value: 'وصف' }, { name: 'status', value: 'draft' }
+  ] };
+  const created = sbDLP.adminView.__test.collectSubjectPayload(newForm);
+  equal(created.id, 'new-subject', 'id يجب أن يُضاف عند الإنشاء');
+  equal(created.title, 'مادة', 'title يجب أن يُقرأ من النموذج');
+  equal(created.status, 'draft', 'status يجب أن يُقرأ من النموذج');
+
+  const editForm = { elements: [
+    { name: 'title', value: 'مادة معدَّلة' }, { name: 'short_title', value: '' }, { name: 'icon', value: '' },
+    { name: 'accent', value: '' }, { name: 'description', value: '' }, { name: 'status', value: 'published' }
+  ] };
+  const updated = sbDLP.adminView.__test.collectSubjectPayload(editForm);
+  equal(updated.id, undefined, 'id يجب ألا يظهر عند التعديل (لا حقل id في النموذج)');
+  equal(updated.title, 'مادة معدَّلة', 'title المعدَّل يجب أن يظهر');
+});
+
+test('adminView.__test.moveSubject(): يبدّل ترتيب معرّفين متجاورين فقط، ويتجاهل تحريك الطرف خارج الحدود', () => {
+  const sbDLP = loadAdminLayer('assets/js/components/admin/index.js', {});
+  const subjects = [{ id: 'a' }, { id: 'b' }, { id: 'c' }];
+  equal(sbDLP.adminView.__test.moveSubject(subjects, 'b', -1).join(','), 'b,a,c', 'تحريك b للأعلى يبدّلها مع a');
+  equal(sbDLP.adminView.__test.moveSubject(subjects, 'b', 1).join(','), 'a,c,b', 'تحريك b للأسفل يبدّلها مع c');
+  equal(sbDLP.adminView.__test.moveSubject(subjects, 'a', -1).join(','), 'a,b,c', 'تحريك الأول للأعلى لا يفعل شيئاً (خارج الحدود)');
+  equal(sbDLP.adminView.__test.moveSubject(subjects, 'c', 1).join(','), 'a,b,c', 'تحريك الأخير للأسفل لا يفعل شيئاً (خارج الحدود)');
 });
 
 testAsync('api.isAdminOrInstructor(): تُعيد نتيجة RPC كما هي لمستخدم عادي (false)', async () => {
@@ -1586,6 +1769,183 @@ test('admin/questions.js — renderQuestionRow(): لا يرمي على سؤال 
     id: 'q-open-1', type: 'open', prompt: 'اشرح بإيجاز', answer: null
   });
   assert(html.indexOf('q-open-1') !== -1, 'يجب عرض معرّف السؤال حتى للنوع المفتوح');
+});
+
+test('admin/questions.js — parseMcqOptions(): يحدّد correctIndex من علامة * ويحذفها من النص', () => {
+  const sbDLP = loadAdminLayer('assets/js/components/admin/questions.js', {});
+  const result = sbDLP.adminQuestionsView.__test.parseMcqOptions('خيار أول\n*خيار صحيح\nخيار ثالث');
+  equal(result.correctIndex, 1, 'الخيار المُعلَّم بـ* في المنتصف يجب أن يكون فهرسه 1');
+  equal(result.options.length, 3, 'يجب بناء 3 خيارات');
+  equal(result.options[1].label, 'خيار صحيح', 'علامة * يجب أن تُحذَف من نص الخيار');
+  assert(result.options[1].is_correct === true, 'الخيار المُعلَّم يجب أن يحمل is_correct=true');
+  assert(!result.options[0].is_correct && !result.options[2].is_correct, 'بقية الخيارات يجب ألا تحمل is_correct');
+});
+
+test('admin/questions.js — mcqOptionsToText()/parseMcqOptions(): جولة كاملة ذهاباً وإياباً تحافظ على البيانات', () => {
+  const sbDLP = loadAdminLayer('assets/js/components/admin/questions.js', {});
+  const original = [{ position: 0, label: 'أ', is_correct: false }, { position: 1, label: 'ب', is_correct: true }];
+  const text = sbDLP.adminQuestionsView.__test.mcqOptionsToText(original);
+  const parsed = sbDLP.adminQuestionsView.__test.parseMcqOptions(text);
+  equal(parsed.correctIndex, 1, 'يجب استعادة نفس فهرس الإجابة الصحيحة بعد التحويل ذهاباً وإياباً');
+  equal(parsed.options.map((o) => o.label).join(','), 'أ,ب', 'يجب استعادة نفس تسميات الخيارات بالترتيب نفسه');
+});
+
+test('admin/questions.js — parsePairs()/pairsToText(): يفصل يسار/يمين بـ :: ويحافظ على الترتيب', () => {
+  const sbDLP = loadAdminLayer('assets/js/components/admin/questions.js', {});
+  const parsed = sbDLP.adminQuestionsView.__test.parsePairs('خطر عالي :: نقل أو تجنّب\nخطر منخفض :: قبول');
+  equal(parsed.length, 2, 'يجب بناء زوجين');
+  equal(parsed[0].left_text, 'خطر عالي', 'left_text يجب أن يكون الجزء الأول');
+  equal(parsed[0].right_text, 'نقل أو تجنّب', 'right_text يجب أن يكون الجزء الثاني');
+  equal(parsed[1].position, 1, 'position يجب أن يعكس ترتيب الأسطر');
+});
+
+test('admin/questions.js — parseItems()/itemsToText(): يبني عناصر مرتَّبة من سطور نصية', () => {
+  const sbDLP = loadAdminLayer('assets/js/components/admin/questions.js', {});
+  const parsed = sbDLP.adminQuestionsView.__test.parseItems('الخطوة الأولى\nالخطوة الثانية');
+  equal(parsed.map((i) => i.item_text).join('|'), 'الخطوة الأولى|الخطوة الثانية', 'يجب بناء item_text لكل سطر');
+  const text = sbDLP.adminQuestionsView.__test.itemsToText(parsed.map((i, idx) => ({ position: idx, text: i.item_text })));
+  equal(text, 'الخطوة الأولى\nالخطوة الثانية', 'itemsToText يجب أن يعيد نفس النص الأصلي');
+});
+
+test('admin/questions.js — parseRubric(): يفصل نص المعيار عن كلماته المفتاحية بـ ::', () => {
+  const sbDLP = loadAdminLayer('assets/js/components/admin/questions.js', {});
+  const parsed = sbDLP.adminQuestionsView.__test.parseRubric('حدّد المخاطر الرئيسية :: مخاطر,تحديد\nبلا كلمات مفتاحية');
+  equal(parsed[0].text, 'حدّد المخاطر الرئيسية', 'text يجب أن يكون الجزء الأول');
+  equal(parsed[0].keywords.join(','), 'مخاطر,تحديد', 'keywords يجب أن تُفصَل بفاصلة');
+  equal(parsed[1].keywords.length, 0, 'سطر بلا :: يجب أن يُبنى بكلمات مفتاحية فارغة بلا رمي');
+});
+
+test('admin/questions.js — collectQuestionSubmission(): mcq يبني answer=correctIndex ويطلب استبدال question_options', () => {
+  const sbDLP = loadAdminLayer('assets/js/components/admin/questions.js', {});
+  const form = {
+    dataset: { type: 'mcq' },
+    elements: [
+      { name: 'id', value: 'q1' }, { name: 'prompt', value: 'سؤال' }, { name: 'difficulty', value: 'easy' },
+      { name: 'status', value: 'published' }, { name: 'options_raw', value: 'خطأ\n*صحيح' }
+    ]
+  };
+  const result = sbDLP.adminQuestionsView.__test.collectQuestionSubmission(form, 'quiz1');
+  equal(result.payload.type, 'mcq', 'type يجب أن يُقرأ من dataset');
+  equal(result.payload.answer, 1, 'answer يجب أن يكون فهرس الخيار الصحيح (رقم لا مصفوفة)');
+  equal(result.children.table, 'question_options', 'يجب طلب استبدال question_options');
+  equal(result.children.rows.length, 2, 'يجب بناء صفَّي خيارات');
+});
+
+test('admin/questions.js — collectQuestionSubmission(): tf/fill يكتبان answer مباشرة بلا صفوف فرعية', () => {
+  const sbDLP = loadAdminLayer('assets/js/components/admin/questions.js', {});
+  const tfForm = {
+    dataset: { type: 'tf' },
+    elements: [{ name: 'prompt', value: 'سؤال' }, { name: 'status', value: 'published' }, { name: 'answer_bool', value: 'false' }]
+  };
+  const tfResult = sbDLP.adminQuestionsView.__test.collectQuestionSubmission(tfForm, 'quiz1');
+  equal(tfResult.payload.answer, false, 'answer لسؤال tf يجب أن يكون boolean فعلي لا نصاً');
+  equal(tfResult.children, null, 'tf لا يحتاج أي صفوف فرعية');
+
+  const fillForm = {
+    dataset: { type: 'fill' },
+    elements: [{ name: 'prompt', value: 'سؤال' }, { name: 'status', value: 'published' }, { name: 'fill_answers_raw', value: 'إجابة1\nإجابة2' }]
+  };
+  const fillResult = sbDLP.adminQuestionsView.__test.collectQuestionSubmission(fillForm, 'quiz1');
+  equal(fillResult.payload.answer.join(','), 'إجابة1,إجابة2', 'answer لسؤال fill يجب أن يكون مصفوفة نصوص');
+});
+
+test('admin/questions.js — collectQuestionSubmission(): match/order يطلبان استبدال الجدول الفرعي الصحيح بلا answer', () => {
+  const sbDLP = loadAdminLayer('assets/js/components/admin/questions.js', {});
+  const matchForm = {
+    dataset: { type: 'match' },
+    elements: [{ name: 'prompt', value: 'طابق' }, { name: 'status', value: 'published' }, { name: 'pairs_raw', value: 'أ :: ١' }]
+  };
+  const matchResult = sbDLP.adminQuestionsView.__test.collectQuestionSubmission(matchForm, 'quiz1');
+  equal(matchResult.payload.answer, null, 'match لا يستخدم عمود answer إطلاقاً');
+  equal(matchResult.children.table, 'question_pairs', 'match يجب أن يطلب استبدال question_pairs');
+
+  const orderForm = {
+    dataset: { type: 'order' },
+    elements: [{ name: 'prompt', value: 'رتّب' }, { name: 'status', value: 'published' }, { name: 'items_raw', value: 'أولاً\nثانياً' }]
+  };
+  const orderResult = sbDLP.adminQuestionsView.__test.collectQuestionSubmission(orderForm, 'quiz1');
+  equal(orderResult.children.table, 'question_items', 'order يجب أن يطلب استبدال question_items');
+  equal(orderResult.children.rows.length, 2, 'يجب بناء صفَّي عناصر بترتيب الأسطر');
+});
+
+/* -------------------- admin/crud-page.js — مصنع صفحات CRUD عامة (Phase D) -------------------- */
+group('admin/crud-page.js — مصنع CRUD عام (lectures/summaries/assignments/...)');
+
+const SAMPLE_CRUD_CONFIG = {
+  table: 'lectures',
+  titleKey: 'admin.hub.lectures',
+  orderColumn: 'number',
+  fields: [
+    { name: 'number', labelKey: 'admin.field.number', type: 'number', required: true },
+    { name: 'title', labelKey: 'admin.field.title', type: 'text', required: true },
+    { name: 'objectives', labelKey: 'admin.field.objectives', type: 'lines' }
+  ],
+  rowLabel: (row) => row.title,
+  childrenChecks: [{ table: 'summaries', fk: 'lecture_id' }]
+};
+
+test('createPage().render(): بلا DLP.auth تعرض حالة "قريباً" مثل بقية صفحات الإدارة', () => {
+  const sbDLP = loadAdminLayer('assets/js/components/admin/shared.js', {});
+  const page = sbDLP.adminCrud.createPage(SAMPLE_CRUD_CONFIG);
+  const html = page.render();
+  assert(html.indexOf('soon-card') !== -1, 'يجب عرض بطاقة قريباً بلا DLP.auth');
+});
+
+test('createPage().render(): يدعو لتسجيل الدخول حين الاتصال جاهز بلا مستخدم', () => {
+  const sbDLP = loadAdminLayer('assets/js/components/admin/shared.js', {
+    fakeAuth: { isAvailable: () => true, onChange: (cb) => { cb(null); return () => {}; } }
+  });
+  const page = sbDLP.adminCrud.createPage(SAMPLE_CRUD_CONFIG);
+  const html = page.render();
+  assert(html.indexOf('data-admin-action="sign-in"') !== -1, 'زر تسجيل الدخول يجب أن يظهر');
+});
+
+test('parseFieldValue(): النوع number يحوّل النص إلى رقم، والفارغ إلى null', () => {
+  const sbDLP = loadAdminLayer('assets/js/components/admin/shared.js', {});
+  const page = sbDLP.adminCrud.createPage(SAMPLE_CRUD_CONFIG);
+  equal(page.__test.parseFieldValue({ type: 'number' }, '7'), 7, 'يجب التحويل لرقم فعلي');
+  equal(page.__test.parseFieldValue({ type: 'number' }, ''), null, 'فارغ يجب أن يصبح null لا NaN');
+});
+
+test('parseFieldValue(): النوع lines يبني مصفوفة نصوص، يتجاهل الأسطر الفارغة', () => {
+  const sbDLP = loadAdminLayer('assets/js/components/admin/shared.js', {});
+  const page = sbDLP.adminCrud.createPage(SAMPLE_CRUD_CONFIG);
+  const result = page.__test.parseFieldValue({ type: 'lines' }, 'هدف أول\n\n  هدف ثانٍ  \n');
+  equal(result.join('|'), 'هدف أول|هدف ثانٍ', 'يجب تقليم كل سطر وحذف الفراغات');
+});
+
+test('parseFieldValue(): النوع concepts يبني {term,definition} من صيغة term :: definition', () => {
+  const sbDLP = loadAdminLayer('assets/js/components/admin/shared.js', {});
+  const page = sbDLP.adminCrud.createPage(SAMPLE_CRUD_CONFIG);
+  const result = page.__test.parseFieldValue({ type: 'concepts' }, 'RLS :: أمان على مستوى الصف\nRPC :: دالة عن بُعد');
+  equal(result.length, 2, 'يجب بناء عنصرين');
+  equal(result[0].term, 'RLS', 'term يجب أن يكون الجزء الأول');
+  equal(result[0].definition, 'أمان على مستوى الصف', 'definition يجب أن يكون الباقي');
+});
+
+test('collectPayload(): يبني payload يشمل subject_id/status وكل الحقول المُعرَّفة محوَّلة بنوعها', () => {
+  const sbDLP = loadAdminLayer('assets/js/components/admin/shared.js', {});
+  const page = sbDLP.adminCrud.createPage(SAMPLE_CRUD_CONFIG);
+  const fakeForm = {
+    elements: [
+      { name: 'number', value: '3' }, { name: 'title', value: 'محاضرة تجريبية' },
+      { name: 'objectives', value: 'هدف1\nهدف2' }, { name: 'status', value: 'published' }
+    ]
+  };
+  const payload = page.__test.collectPayload(fakeForm, 's1');
+  equal(payload.subject_id, 's1', 'subject_id يجب أن يُضاف تلقائياً من نطاق الصفحة');
+  equal(payload.status, 'published', 'status يجب أن يُقرأ من النموذج');
+  equal(payload.number, 3, 'number يجب أن يتحوّل لرقم فعلي');
+  equal(payload.objectives.join(','), 'هدف1,هدف2', 'objectives يجب أن تتحوّل لمصفوفة');
+});
+
+test('collectPayload(): عند الإنشاء (id موجود في النموذج) يُضاف id للـ payload؛ عند التعديل لا', () => {
+  const sbDLP = loadAdminLayer('assets/js/components/admin/shared.js', {});
+  const page = sbDLP.adminCrud.createPage(SAMPLE_CRUD_CONFIG);
+  const newForm = { elements: [{ name: 'id', value: 'rm-l9' }, { name: 'number', value: '9' }, { name: 'title', value: 'محاضرة' }, { name: 'status', value: 'draft' }] };
+  equal(page.__test.collectPayload(newForm, 's1').id, 'rm-l9', 'id يجب أن يُضاف عند الإنشاء');
+  const editForm = { elements: [{ name: 'number', value: '9' }, { name: 'title', value: 'محاضرة' }, { name: 'status', value: 'draft' }] };
+  equal(page.__test.collectPayload(editForm, 's1').id, undefined, 'id يجب ألا يظهر في payload التعديل (لا حقل id في النموذج أصلاً)');
 });
 
 testAsync('api.isAdminOrInstructor(): تُعيد false بهدوء بلا عميل (لا استثناء)', async () => {
