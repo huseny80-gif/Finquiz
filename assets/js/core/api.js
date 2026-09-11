@@ -254,6 +254,30 @@
     });
   }
 
+  /* -------------------------------------------------------------------- */
+  /* سقالة الإدارة (Stage 4) — قراءة فقط. الكتابة تبقى عبر RLS مباشرة        */
+  /* (content_write_admin/questions_write_admin/... في 002_rls.sql) في مرحلة */
+  /* لاحقة؛ لا نماذج تحرير/حذف هنا بعد.                                     */
+  /* -------------------------------------------------------------------- */
+
+  /** فحص دور واجهي بحت (تحسين تجربة استخدام) — الحماية الفعلية دائماً في RLS
+   * وGRANT/REVOKE على مستوى القاعدة، لا في هذا الفحص. مصدره has_role/
+   * is_admin_or_instructor نفسهما المستخدَمان داخل كل سياسات RLS. */
+  function isAdminOrInstructor() {
+    return requireClient().then(function (c) {
+      return c.rpc('is_admin_or_instructor').then(unwrap);
+    }).catch(function () { return false; });
+  }
+
+  /** يعيد كل أسئلة اختبار واحد بكامل أعمدتها (بما فيها الإجابات) — يرفض
+   * الخادم الطلب صراحةً (42501) لغير admin/instructor؛ انظر
+   * supabase/migrations/005_admin_read_functions.sql. */
+  function fetchQuizQuestionsAdmin(quizId) {
+    return requireClient().then(function (c) {
+      return c.rpc('admin_get_quiz_questions', { p_quiz_id: quizId }).then(unwrap);
+    });
+  }
+
   DLP.api = {
     isReady: isReady,
     fetchAllContent: fetchAllContent,
@@ -264,7 +288,9 @@
     finishQuizAttempt: finishQuizAttempt,
     revealQuestionAnswer: revealQuestionAnswer,
     fetchStudentProgress: fetchStudentProgress,
-    fetchMyAttempts: fetchMyAttempts
+    fetchMyAttempts: fetchMyAttempts,
+    isAdminOrInstructor: isAdminOrInstructor,
+    fetchQuizQuestionsAdmin: fetchQuizQuestionsAdmin
   };
 
   if (typeof module !== 'undefined' && module.exports) { module.exports = DLP.api; }

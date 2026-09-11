@@ -107,6 +107,18 @@
     DLP.dashboardView.bind();
   }
 
+  function renderAdmin() {
+    setTitle([t('admin.title')], t('admin.intro'));
+    paint(DLP.adminView.render());
+    DLP.adminView.bind();
+  }
+
+  function renderAdminQuiz(params) {
+    setTitle([t('admin.questionsTitle'), t('admin.title')], t('admin.intro'));
+    paint(DLP.adminQuestionsView.render());
+    DLP.adminQuestionsView.bind(params.quizId);
+  }
+
   /** تمرير التركيز إلى عنصر محدّد عبر ?focus= */
   function focusTarget(query) {
     if (!query || !query.focus) { return; }
@@ -146,6 +158,8 @@
     DLP.router.add('/assistant', renderAssistant);
     DLP.router.add('/certificates', renderCertificates);
     DLP.router.add('/dashboard', renderDashboard);
+    DLP.router.add('/admin', renderAdmin);
+    DLP.router.add('/admin/quiz/:quizId', renderAdminQuiz);
     DLP.router.add('/subject/:id', renderSubject);
     DLP.router.add('/subject/:id/:section', renderSubject);
     DLP.router.setNotFound(renderNotFound);

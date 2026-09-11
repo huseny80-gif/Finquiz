@@ -18,6 +18,8 @@
    supabase/migrations/002_rls.sql
    supabase/migrations/003_functions.sql
    supabase/migrations/004_fix_mcq_grading_operator.sql
+   supabase/migrations/005_admin_read_functions.sql
+   supabase/migrations/006_harden_rpc_grants.sql
    ```
    عبر SQL Editor في لوحة Supabase (نسخ/لصق كل ملف بالكامل وتنفيذه)، أو عبر:
    ```

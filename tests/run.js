@@ -411,8 +411,15 @@ test('الجدول الإنجليزي مكتمل ومطابق للعربية م�
 
 test('لا توجد نصوص عربية مكتوبة داخل مكوّنات الواجهة', () => {
   const arabic = /[\u0600-\u06FF]/;
-  const files = fs.readdirSync(path.join(ROOT, 'assets/js/components'))
-    .map((name) => path.join(ROOT, 'assets/js/components', name))
+  function walkJsFiles(dir, out) {
+    fs.readdirSync(dir, { withFileTypes: true }).forEach((entry) => {
+      const full = path.join(dir, entry.name);
+      if (entry.isDirectory()) { walkJsFiles(full, out); }
+      else if (entry.name.endsWith('.js')) { out.push(full); }
+    });
+    return out;
+  }
+  const files = walkJsFiles(path.join(ROOT, 'assets/js/components'), [])
     .concat([path.join(ROOT, 'assets/js/app.js')]);
   const leaks = [];
   files.forEach((file) => {
@@ -993,6 +1000,90 @@ test('formatTimestamp(): يحوّل طابعاً زمنياً كاملاً (time
 test('formatTimestamp(): قيمة فارغة/null لا تكسر التنسيق', () => {
   const sbDLP = loadDashboardLayer({});
   equal(sbDLP.dashboardView.__test.formatTimestamp(null), '', 'يجب أن تُعيد نصاً فارغاً بهدوء');
+});
+
+/* -------------------- admin scaffold — Stage 4 (قراءة فقط) -------------------- */
+group('admin scaffold — سقالة الإدارة (قراءة فقط، بلا كشف قبل التحقق من الدور)');
+
+/** يحمّل المنصة كاملة + layout.js ثم أحد ملفّي admin/*.js، مع حقن DLP.auth/DLP.api
+ * وهميّين قبل التحميل (نفس أسلوب loadDashboardLayer). */
+function loadAdminLayer(componentFile, options) {
+  options = options || {};
+  const sandbox = { console, location: { hash: '' }, addEventListener() {}, document: null };
+  sandbox.window = sandbox;
+  sandbox.globalThis = sandbox;
+  vm.createContext(sandbox);
+  const platformFiles = require('./harness').FILES;
+  platformFiles.concat(['assets/js/components/layout.js']).forEach((file) => {
+    vm.runInContext(fs.readFileSync(path.join(ROOT, file), 'utf8'), sandbox, { filename: file });
+  });
+  if (options.fakeAuth) { sandbox.DLP.auth = options.fakeAuth; }
+  if (options.fakeApi) { sandbox.DLP.api = options.fakeApi; }
+  vm.runInContext(fs.readFileSync(path.join(ROOT, componentFile), 'utf8'), sandbox, { filename: componentFile });
+  return sandbox.DLP;
+}
+
+test('adminView.render(): حالة "قريباً" بلا DLP.auth (enabled:false اليوم)', () => {
+  const sbDLP = loadAdminLayer('assets/js/components/admin/index.js', {});
+  const html = sbDLP.adminView.render();
+  assert(html.indexOf('soon-card') !== -1, 'يجب عرض بطاقة قريباً');
+  assert(html.indexOf('data-admin-action="sign-in"') === -1, 'لا يجوز عرض زر تسجيل دخول بلا اتصال');
+});
+
+test('adminView.render(): دعوة تسجيل الدخول حين الاتصال جاهز بلا مستخدم، بلا كشف أي جدول', () => {
+  const sbDLP = loadAdminLayer('assets/js/components/admin/index.js', {
+    fakeAuth: { isAvailable: () => true, onChange: (cb) => { cb(null); return () => {}; } }
+  });
+  const html = sbDLP.adminView.render();
+  assert(html.indexOf('data-admin-action="sign-in"') !== -1, 'زر تسجيل الدخول يجب أن يظهر');
+  assert(html.indexOf('data-table') === -1, 'لا يجوز ظهور أي جدول قبل تسجيل الدخول');
+});
+
+testAsync('api.isAdminOrInstructor(): تُعيد نتيجة RPC كما هي لمستخدم عادي (false)', async () => {
+  const sbDLP = loadAdminLayer('assets/js/components/admin/index.js', {
+    fakeAuth: { isAvailable: () => true, onChange: (cb) => { cb({ id: 'student-1' }); return () => {}; } },
+    fakeApi: { isAdminOrInstructor: () => Promise.resolve(false) }
+  });
+  const isAdmin = await sbDLP.api.isAdminOrInstructor();
+  equal(isAdmin, false, 'مستخدم عادي لا يجوز أن يُعامَل كمشرف');
+});
+
+test('admin/questions.js — correctAnswerLabel(): mcq تعرض نص الخيار الصحيح لا فهرسه', () => {
+  const sbDLP = loadAdminLayer('assets/js/components/admin/questions.js', {});
+  const label = sbDLP.adminQuestionsView.__test.correctAnswerLabel({
+    type: 'mcq', options: [{ label: 'أ', is_correct: false }, { label: 'ب', is_correct: true }]
+  });
+  equal(label, 'ب', 'يجب عرض نص الخيار الصحيح المحدَّد فعلياً بـ is_correct');
+});
+
+test('admin/questions.js — correctAnswerLabel(): match تعرض كل الأزواج الصحيحة', () => {
+  const sbDLP = loadAdminLayer('assets/js/components/admin/questions.js', {});
+  const label = sbDLP.adminQuestionsView.__test.correctAnswerLabel({
+    type: 'match', pairs: [{ left: 'س', right: 'ص' }, { left: 'ع', right: 'غ' }]
+  });
+  assert(label.indexOf('س ← ص') !== -1 && label.indexOf('ع ← غ') !== -1, 'يجب عرض كل أزواج المطابقة الصحيحة');
+});
+
+test('admin/questions.js — correctAnswerLabel(): order تعرض الترتيب الصحيح كاملاً', () => {
+  const sbDLP = loadAdminLayer('assets/js/components/admin/questions.js', {});
+  const label = sbDLP.adminQuestionsView.__test.correctAnswerLabel({
+    type: 'order', items: [{ text: 'أولاً' }, { text: 'ثانياً' }]
+  });
+  equal(label, 'أولاً ← ثانياً', 'يجب عرض ترتيب العناصر الصحيح بالكامل');
+});
+
+test('admin/questions.js — renderQuestionRow(): لا يرمي على سؤال بلا options/pairs/items (نوع open مثلاً)', () => {
+  const sbDLP = loadAdminLayer('assets/js/components/admin/questions.js', {});
+  const html = sbDLP.adminQuestionsView.__test.renderQuestionRow({
+    id: 'q-open-1', type: 'open', prompt: 'اشرح بإيجاز', answer: null
+  });
+  assert(html.indexOf('q-open-1') !== -1, 'يجب عرض معرّف السؤال حتى للنوع المفتوح');
+});
+
+testAsync('api.isAdminOrInstructor(): تُعيد false بهدوء بلا عميل (لا استثناء)', async () => {
+  const sbDLP = loadSupabaseLayer({});
+  const result = await sbDLP.api.isAdminOrInstructor();
+  equal(result, false, 'يجب أن تُعيد false بلا عميل');
 });
 
 /* ------------------------------ النتيجة ------------------------------ */

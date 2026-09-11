@@ -1,9 +1,11 @@
 # مخطط قاعدة بيانات Finquiz على Supabase/PostgreSQL
 
 يوثّق هذا الملف المخطط المطبَّق فعلياً على مشروع Supabase الحي (`kotbarynxzyhxhzribpf`) عبر
-`supabase/migrations/001_initial_schema.sql`، `002_rls.sql`، `003_functions.sql`، و
+`supabase/migrations/001_initial_schema.sql`، `002_rls.sql`، `003_functions.sql`،
 `004_fix_mcq_grading_operator.sql` (إصلاح صغير: استبدال `->>0` غير الموثّق بـ `#>>'{}'` الموثّق
-في تصحيح mcq داخل `save_quiz_answer` — تحقّق تجريبي كامل في `IMPLEMENTATION_REPORT.md`).
+في تصحيح mcq داخل `save_quiz_answer`)، `005_admin_read_functions.sql` (دالة قراءة كاملة الأعمدة
+للأسئلة، admin/instructor فقط)، و`006_harden_rpc_grants.sql` (تشديد صلاحيات تنفيذ RPC — انظر
+تفاصيل الثلاثة الأخيرة في `IMPLEMENTATION_REPORT.md`).
 
 ## مبدأ التصميم: مفاتيح مزدوجة النوع
 
@@ -72,9 +74,36 @@ grant select (id, quiz_id, lecture_id, type, difficulty, prompt, kind, status, c
 أسئلة المطابقة **غير قابلة للعرض للطلاب حتى إشعار آخر**. موثّق كذلك في `002_rls.sql` كتعليق `TODO`
 وفي `IMPLEMENTATION_REPORT.md`.
 
+## دالة قراءة الإدارة: `admin_get_quiz_questions` (منذ 005)
+
+أعمدة الإجابات على مستوى العمود (§"نمط منع تسريب الإجابات" أعلاه) محجوبة عن anon/authenticated
+**بلا شرط** — أي أن admin/instructor بحساب `authenticated` عادي لا يستطيعون قراءتها عبر REST
+مباشرة أيضاً؛ فقط `service_role` (المُستخدَم فقط لتطبيق الـ migrations) يملك تلك الأعمدة. لحل
+هذا لسقالة الإدارة (Stage 4)، تتحقّق `admin_get_quiz_questions(p_quiz_id)` من
+`is_admin_or_instructor()` أولاً (وترفض بوضوح 42501 إن لم يكن كذلك)، ثم تُعيد كل أسئلة الاختبار
+كـ `jsonb` بكامل أعمدتها (`answer`, `rubric`, `explanation`, و`is_correct` لكل خيار) — دفعة واحدة
+لكل اختبار، على غرار `reveal_question_answer` لكن لسؤال واحد بعد إجابة الطالب عليه.
+
+## تشديد صلاحيات RPC (منذ 006) — اكتشاف واقعي أثناء بناء سقالة الإدارة
+
+`revoke all on function ... from public;` (المستخدَم في 003 و005) **لا يُلغي فعلياً** صلاحية
+`anon`/`authenticated`، لأن Supabase يمنح `EXECUTE` افتراضياً لهذين الدورين تحديداً (عبر
+`ALTER DEFAULT PRIVILEGES`، لا عبر الدور الوهمي `PUBLIC`) عند إنشاء أي دالة. وبما أن
+`REVOKE ... FROM PUBLIC` لا يسحب امتيازاً مُنحاً صراحةً لدور مسمّى، بقيت `anon` قادرة تقنياً على
+استدعاء `reveal_question_answer`/`start_quiz_attempt`/`save_quiz_answer`/`finish_quiz_attempt`/
+`admin_get_quiz_questions` عبر `/rest/v1/rpc/<fn>` — تحقّقنا من هذا تجريبياً عبر
+`information_schema.role_routine_grants`. لا تسريب فعلي وقع (كل هذه الدوال ترفض المستخدم غير
+المصرَّح له داخلياً برسالة خطأ واضحة)، لكن `006_harden_rpc_grants.sql` ضيّق ذلك بـ
+`revoke execute ... from anon` صراحةً، وسحب صلاحية التنفيذ بالكامل من anon/authenticated على
+`handle_new_user` (تُشغَّل عبر trigger فقط — لم تكن مقيَّدة إطلاقاً في 003، وكان لها منح `PUBLIC`
+الافتراضي القياسي في PostgreSQL نفسه لا منح Supabase الخاص، فاستُخدم `revoke ... from public` لها
+تحديداً لا `from anon, authenticated`) و`recompute_student_progress` (داخلية بحتة).
+
 ## تحذيرات أمان/أداء مؤجَّلة (من `get_advisors`)
 
 - دالتا `has_role`/`is_admin_or_instructor` قابلتان للاستدعاء كـ RPC مباشر من anon/authenticated
+  **عمداً وبعد مراجعة**: لا يمكن سحب هذه الصلاحية لأنهما تُستخدَمان داخل تعبيرات `USING` في كل
+  سياسات RLS تقريباً؛ سحب `EXECUTE` منهما سيكسر تقييم RLS نفسه لأي قارئ عادي anon/authenticated.
   (تحذير أمان بمستوى منخفض المخاطر — لا تُسرّبان بيانات، فقط تُعيدان boolean).
 - ~11 سياسة RLS يُفضَّل لف `auth.uid()` فيها بـ `(select auth.uid())` لتحسين الأداء (`auth_rls_initplan`).
 - بعض الفهارس على مفاتيح أجنبية غير مستخدمة بعد لأن الجداول ما زالت صغيرة.

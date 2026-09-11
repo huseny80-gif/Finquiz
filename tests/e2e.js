@@ -459,6 +459,21 @@ function group(name) { console.log('\n▶ ' + name); }
     assert(crumbs[crumbs.length - 1].length > 0, 'العنصر الأخير في شريط المسار فارغ');
   });
 
+  group('سقالة الإدارة (Admin scaffold)');
+
+  await test('لوحة الإدارة تعرض حالة "قريباً" ما دام الاتصال الحي غير مفعَّل', async () => {
+    await page.goto(base + '#/admin', { waitUntil: 'domcontentloaded' });
+    const text = await page.textContent('#main');
+    assert(text.includes('قريباً') || text.includes('Coming soon'), 'لم تظهر حالة عدم التوفر المتوقعة');
+    assert(!(await page.$('[data-admin-action="sign-in"]')), 'زر تسجيل الدخول لا يجوز ظهوره والاتصال معطَّل');
+  });
+
+  await test('مسار عرض أسئلة اختبار محدَّد في الإدارة يعمل ويعرض نفس حالة "قريباً"', async () => {
+    await page.goto(base + '#/admin/quiz/ai-q1', { waitUntil: 'domcontentloaded' });
+    const text = await page.textContent('#main');
+    assert(text.includes('قريباً') || text.includes('Coming soon'), 'لم تظهر حالة عدم التوفر المتوقعة');
+  });
+
   group('التذييل والروابط');
 
   await test('التذييل يحتوي روابط المواد ومن نحن وحقوق النشر', async () => {
@@ -573,7 +588,7 @@ function group(name) { console.log('\n▶ ' + name); }
 
   await test('لا توجد أخطاء في الـ Console عبر كل الصفحات', async () => {
     consoleErrors.length = 0;
-    const urls = [base, base + '#/about', base + '#/search?q=المخاطر', base + '#/dashboard'];
+    const urls = [base, base + '#/about', base + '#/search?q=المخاطر', base + '#/dashboard', base + '#/admin', base + '#/admin/quiz/ai-q1'];
     SUBJECTS.forEach((id) => SECTIONS.forEach((s) => urls.push(base + '#/subject/' + id + '/' + s)));
     for (const url of urls) { await page.goto(url, { waitUntil: 'domcontentloaded' }); }
     assert(consoleErrors.length === 0, 'أخطاء: ' + consoleErrors.slice(0, 5).join(' | '));
