@@ -52,6 +52,15 @@
     };
   }
 
+  /** يستخرج رقم تسلسل السؤال من نهاية معرّفه ("rm-q1-13" → 13) لترتيب الأسئلة
+   * بنفس تسلسل تأليفها الأصلي في data/subjects/*.js — كل معرّف سؤال في البذرة
+   * ينتهي برقم صريح لهذا الغرض (مُتحقَّق: 164/164 معرّفاً يطابق النمط `\d+$` على
+   * القاعدة الحية). معرّف بلا رقم في النهاية (لا يُفترض حدوثه) يُعامَل كـ0. */
+  function questionSeq(id) {
+    var m = /-(\d+)$/.exec(id || '');
+    return m ? parseInt(m[1], 10) : 0;
+  }
+
   /** خلط بسيط لمصفوفة (Fisher-Yates) — تُستخدم لتقديم عناصر order بترتيب لا يطابق
    * بالضرورة ترتيب التخزين الفعلي، حتى لا يكشف ترتيب الصفوف الفعلي (position مخفي
    * عن anon/authenticated لكن ترتيب إرجاع الصفوف نفسه قد يطابقه صدفة بلا هذا الخلط). */
@@ -162,7 +171,14 @@
       // يفشل بـ 42501 لأنه يطلب أعمدة غير ممنوحة، لا يُرجع صفوفاً ناقصة بهدوء.
       return c.from('questions').select('id, quiz_id, lecture_id, type, difficulty, prompt, kind, status')
         .in('quiz_id', quizIds).then(function (qResult) {
-        var questions = unwrap(qResult) || [];
+        // لا عمود ترتيب صريح في questions، والاستعلام بلا order() لا يضمن أي ترتيب
+        // معيَّن لصفوفه (لاحظنا فعلياً عبر CI حقيقي أن الترتيب لا يطابق تسلسل
+        // data/subjects/*.js الأصلي) — معرّف كل سؤال ينتهي دائماً برقم تسلسله
+        // الأصلي ("rm-q1-13")، فنرتّب به صراحةً في العميل بدل الاعتماد على ترتيب
+        // القاعدة الافتراضي (غير المضمون، وغير الرقمي مقارنةً بمعرّفات نصية).
+        var questions = (unwrap(qResult) || []).slice().sort(function (a, b) {
+          return questionSeq(a.id) - questionSeq(b.id);
+        });
         var questionIds = questions.map(function (q) { return q.id; });
         if (!questionIds.length) {
           return assembleSubject(subjectRow, lectures, summaries, assignments,

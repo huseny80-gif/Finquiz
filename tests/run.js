@@ -767,6 +767,30 @@ testAsync('fetchAllContent(): لا يطلب أي عمود غير ممنوح فع
   equal(client.__calls.rpc.length, 1, 'get_match_pairs يُستدعى مرة واحدة فقط لسؤال المطابقة الوحيد');
 });
 
+testAsync('fetchAllContent(): يرتّب الأسئلة برقم تسلسلها من المعرّف بصرف النظر عن ترتيب إرجاع القاعدة', async () => {
+  // اكتُشف فعلياً عبر CI حقيقي (شبكة متصلة بمشروع Supabase فعلي): questions لا
+  // تحمل عمود ترتيب صريح، واستعلام بلا order() لا يضمن أي تسلسل معيَّن — أعاد
+  // القاعدة الحية صفوفاً لا تطابق تسلسل data/subjects/*.js الأصلي فعلياً، مما
+  // كسر تنقّل "التالي" (سؤال مطابقة/ترتيب لم يظهرا في مكانهما المتوقَّع). هذا
+  // الاختبار يحاكي متعمَّداً استعلاماً يُعيد الصفوف بترتيب معكوس/عشوائي (q-10 قبل
+  // q-2) للتأكد من أن api.js يُصحِّح الترتيب بنفسه اعتماداً على رقم المعرّف.
+  const seedRows = {
+    subjects: [{ id: 's1', order: 1, title: 'مادة', short_title: 'م', icon: '📘', accent: '#000', status: 'published', description: '' }],
+    lectures: [], summaries: [], assignments: [],
+    quizzes: [{ id: 'quiz1', subject_id: 's1', title: 'اختبار', status: 'published', demo: false, description: '' }],
+    references: [], resources: [], updates: [],
+    questions: ['q-10', 'q-2', 'q-1', 'q-9'].map((id) => (
+      { id: id, quiz_id: 'quiz1', lecture_id: null, type: 'mcq', difficulty: 'easy', prompt: id, kind: 'auto', status: 'published' }
+    )),
+    question_options: [], question_items: []
+  };
+  const client = fakeColumnCheckingClient(seedRows, {});
+  const sbDLP = loadSupabaseLayer({ configOverride: { enabled: true }, fakeClientLib: { createClient: () => client } });
+  const result = await sbDLP.api.fetchAllContent();
+  const ids = result.data.s1.quizzes[0].questions.map((q) => q.id);
+  equal(ids.join(','), 'q-1,q-2,q-9,q-10', 'يجب ترتيب الأسئلة رقمياً حسب معرّفها لا بترتيب إرجاع القاعدة الخام');
+});
+
 testAsync('fetchAllContent(): يفشل بوضوح لو طلب select(*) خطأً بدل الأعمدة الممنوحة (يثبت أن المحاكي يعمل)', async () => {
   const seedRows = {
     subjects: [{ id: 's1', order: 1, title: 'مادة', short_title: 'م', icon: '📘', accent: '#000', status: 'published', description: '' }],
@@ -1217,7 +1241,11 @@ test('correctAnswerFromRevealed(): order تبني الترتيب الصحيح م
   equal(sbDLP.quizView.__test.correctAnswerFromRevealed({ type: 'order' }, revealed), 'الأول ← الثاني');
 });
 
-test('remoteScore(): تحتسب فقط الأسئلة المحسومة فعلياً (لا إجابات لم تُتحقَّق منها بعد)', () => {
+test('remoteScore(): answered/gradableAnswered تعكسان مجرد اختيار إجابة، correct فقط من الخادم', () => {
+  // اكتُشف عبر CI حقيقي: شريط التقدّم لم يكن يتحرك عند اختيار إجابة قبل الضغط
+  // على "تحقق" لأن answered كانت تعتمد على state.remote (لا يُملأ إلا بعد RPC).
+  // يجب أن تتحرك answered فور الاختيار تماماً كما في الوضع الثابت — correct فقط
+  // ينتظر تصحيحاً خادمياً فعلياً.
   const sbDLP = loadQuizViewLayer({ fakeStore: fakeStoreDatabase() });
   const quiz = {
     id: 'q1',
@@ -1227,15 +1255,31 @@ test('remoteScore(): تحتسب فقط الأسئلة المحسومة فعلي�
     ]
   };
   const state = sbDLP.quizView.__test.createState(quiz);
-  state.remote['q1-1'] = { pending: false, correct: true };
-  state.remote['q1-2'] = { pending: false, correct: false };
-  state.remote['q1-3'] = { pending: true }; // لم يُحسم بعد — يجب ألا يُحتسب answered
-  state.remote['q1-4'] = { pending: false, correct: false }; // open — لا يُحتسب ضمن gradable
+  state.responses['q1-1'] = 1; // اختيار بلا "تحقق" بعد — يجب أن يُحتسب answered فوراً
+  state.responses['q1-2'] = 0;
+  state.responses['q1-3'] = 1;
+  state.responses['q1-4'] = 'نص حر';
+  state.remote['q1-1'] = { pending: false, correct: true };  // تحقّق خادمي بالفعل: صحيحة
+  state.remote['q1-2'] = { pending: false, correct: false }; // تحقّق خادمي بالفعل: خاطئة
+  // q1-3: اختيرت لكن لم يُضغط "تحقق" بعد — لا يوجد state.remote لها إطلاقاً
   const score = sbDLP.quizView.__test.remoteScore(state);
   equal(score.total, 3, 'gradable يجب أن يستثني السؤال المفتوح');
-  equal(score.gradableAnswered, 2, 'سؤالان محسومان فقط ضمن القابل للتصحيح (q1-3 معلَّق)');
-  equal(score.correct, 1, 'إجابة صحيحة واحدة فقط');
-  equal(score.answered, 3, 'answered تشمل المفتوح المحسوم + q1-1 + q1-2 (لا q1-3 المعلَّق)');
+  equal(score.gradableAnswered, 3, 'الأسئلة الثلاثة القابلة للتصحيح جميعها أُجيبت (بصرف النظر عن التحقّق)');
+  equal(score.correct, 1, 'إجابة صحيحة واحدة فقط مؤكَّدة خادمياً (q1-3 لم تُصحَّح بعد فلا تُحتسب)');
+  equal(score.answered, 4, 'answered تشمل كل الأسئلة الأربعة (فتح حر بجواب نصي غير فارغ أيضاً)');
+});
+
+test('hasResponse(): تطابق منطق "answered" في core/quiz.js لكل نوع، بمعزل عن معرفة الإجابة الصحيحة', () => {
+  const sbDLP = loadQuizViewLayer({});
+  const hasResponse = sbDLP.quizView.__test.hasResponse;
+  equal(hasResponse({ type: 'mcq' }, 0), true, 'mcq بقيمة 0 (أول خيار) يجب أن تُحتسب مُجابة');
+  equal(hasResponse({ type: 'mcq' }, undefined), false, 'بلا اختيار يجب ألا تُحتسب');
+  equal(hasResponse({ type: 'fill' }, '   '), false, 'نص فراغ فقط لا يُحتسب إجابة');
+  equal(hasResponse({ type: 'fill' }, 'جواب'), true);
+  equal(hasResponse({ type: 'order', items: ['أ', 'ب', 'ج'] }, ['أ', 'ب']), false, 'ترتيب ناقص لا يُحتسب مكتملاً');
+  equal(hasResponse({ type: 'order', items: ['أ', 'ب', 'ج'] }, ['أ', 'ب', 'ج']), true);
+  equal(hasResponse({ type: 'match', pairsLeft: ['أ', 'ب'] }, ['1', '']), false, 'صف فارغ في المطابقة يعني عدم الاكتمال');
+  equal(hasResponse({ type: 'match', pairsLeft: ['أ', 'ب'] }, ['1', '2']), true);
 });
 
 test('scoreFor(): تُوجِّه للدالة الصحيحة بحسب dataSource (remoteScore مقابل DLP.quiz.score)', () => {

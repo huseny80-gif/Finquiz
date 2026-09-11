@@ -157,22 +157,42 @@
     }
   }
 
-  /** نتيجة الاختبار الكلية للمحتوى القادم من القاعدة — تُحتسب فقط من الأسئلة
-   * التي حصلت فعلاً على تصحيح خادمي (state.remote)، بخلاف الوضع الثابت الذي
-   * يُحسب فوراً من كل إجابة مُختارة حتى قبل الضغط على "تحقق". بنفس حقول
+  /** هل تحمل response قيمة صالحة لهذا النوع — بمعزل عن معرفة الإجابة الصحيحة،
+   * بخلاف DLP.quiz.grade() التي تحتاج question.answer/pairs/items الحقيقية.
+   * تُستخدم فقط لتحديد "answered" في remoteScore، لا لتحديد "correct" أبداً —
+   * الصحة تبقى قادمة حصراً من الخادم (state.remote[].correct). */
+  function hasResponse(question, response) {
+    if (response === null || response === undefined || response === '') { return false; }
+    switch (question.type) {
+      case 'match':
+        var pairCount = Array.isArray(question.pairsLeft) ? question.pairsLeft.length
+          : (question.pairs ? question.pairs.length : 0);
+        return Array.isArray(response) && response.filter(function (v) { return v; }).length === pairCount;
+      case 'order':
+        return Array.isArray(response) && response.length === (question.items ? question.items.length : 0);
+      case 'fill':
+      case 'open':
+        return String(response).trim() !== '';
+      default:
+        return true; // mcq/tf: أي قيمة غير فارغة كافية لاعتبارها "أُجيبت"
+    }
+  }
+
+  /** نتيجة الاختبار الكلية للمحتوى القادم من القاعدة. "answered"/"gradableAnswered"
+   * تعكسان مجرد اختيار إجابة (hasResponse) — بنفس لحظة تحديث شريط التقدّم في
+   * الوضع الثابت تماماً — أما "correct" فتأتي حصراً من تصحيح خادمي مُحسوم فعلاً
+   * (state.remote[].correct)، لا يمكن معرفتها محلياً قبل استدعاء RPC. بنفس حقول
    * DLP.quiz.score() تماماً ليستخدمها renderProgress/renderResult بلا تفريع. */
   function remoteScore(state) {
     var gradable = 0, correct = 0, answered = 0, gradableAnswered = 0;
     state.questions.forEach(function (q) {
-      var r = state.remote[q.id];
-      var isAnswered = !!(r && !r.pending);
-      if (isAnswered) { answered += 1; }
+      var responded = hasResponse(q, state.responses[q.id]);
+      if (responded) { answered += 1; }
       if (q.type !== 'open') {
         gradable += 1;
-        if (isAnswered) {
-          gradableAnswered += 1;
-          if (r.correct) { correct += 1; }
-        }
+        if (responded) { gradableAnswered += 1; }
+        var r = state.remote[q.id];
+        if (r && !r.pending && r.correct) { correct += 1; }
       }
     });
     return {
@@ -748,7 +768,8 @@
       persistAnswer: persistAnswer, persistFinish: persistFinish, ensureAttempt: ensureAttempt,
       remoteMode: remoteMode, checkRemote: checkRemote, gradedFor: gradedFor,
       correctAnswerFromRevealed: correctAnswerFromRevealed, remoteScore: remoteScore,
-      scoreFor: scoreFor, createState: createState, getState: getState, refresh: refresh
+      hasResponse: hasResponse, scoreFor: scoreFor, createState: createState,
+      getState: getState, refresh: refresh
     }
   };
 })(typeof window !== 'undefined' ? window : globalThis);
