@@ -10,6 +10,201 @@
   var states = {};   // quizId -> state
   var STORE_PREFIX = 'dlp.quiz.';
 
+  /* ---------------------------------------------------------------------- */
+  /* حفظ دائم عبر Supabase لمستخدم مسجَّل (Stage 2) — إضافي بحت، لا يغيّر أي   */
+  /* سلوك محلي: التصحيح والعرض يبقيان محلّيين تماماً كما كانا (DLP.quiz.grade */
+  /* يعمل على البيانات الثابتة الحالية بلا تغيير)؛ هذا فقط يُبقي نسخة دائمة   */
+  /* من كل إجابة في quiz_attempts/quiz_answers حين يكون هناك مستخدم مسجَّل     */
+  /* واتصال جاهز — بدل الاعتماد على localStorage وحده (القاعدة رقم 10).      */
+  /* أي فشل شبكة/اتصال يُتجاهل بهدوء ولا يُغيّر أي شيء في واجهة المستخدم.      */
+  /* ---------------------------------------------------------------------- */
+
+  var currentUser = null;
+  if (DLP.auth && typeof DLP.auth.onChange === 'function') {
+    DLP.auth.onChange(function (user) { currentUser = user; });
+  }
+
+  function canPersist() {
+    return !!currentUser && !!DLP.api && typeof DLP.api.isReady === 'function' && DLP.api.isReady();
+  }
+
+  var attemptPromises = {}; // quizId -> Promise<attemptId>
+
+  function ensureAttempt(quiz) {
+    if (!attemptPromises[quiz.id]) {
+      attemptPromises[quiz.id] = DLP.api.startQuizAttempt(quiz.id).catch(function (error) {
+        delete attemptPromises[quiz.id]; // يسمح بمحاولة جديدة لاحقاً بدل تجميد الفشل للأبد
+        throw error;
+      });
+    }
+    return attemptPromises[quiz.id];
+  }
+
+  /** يحوّل إجابة العميل إلى الشكل الذي تتوقعه save_quiz_answer لكل نوع سؤال
+   * (انظر supabase/migrations/003_functions.sql وDATABASE_SCHEMA.md). */
+  function toServerResponse(question, response) {
+    switch (question.type) {
+      case 'mcq':  return Number(response);
+      case 'tf':   return response === true || response === 'true';
+      case 'fill': return String(response == null ? '' : response);
+      case 'open': return String(response == null ? '' : response);
+      case 'order':
+      case 'match': return Array.isArray(response) ? response.slice() : [];
+      default: return response;
+    }
+  }
+
+  /** تُعيد Promise لتسهيل الاختبار؛ نداءات الواجهة الفعلية لا تنتظرها أبداً
+   * (fire-and-forget) — أي فشل هنا لا يجوز أن يؤخّر أو يغيّر تفاعل المستخدم. */
+  function persistAnswer(quiz, question, response) {
+    if (!canPersist()) { return Promise.resolve(false); }
+    return ensureAttempt(quiz)
+      .then(function (attemptId) { return DLP.api.saveQuizAnswer(attemptId, question.id, toServerResponse(question, response)); })
+      .then(function () { return true; })
+      .catch(function () { return false; }); // فشل بهدوء — التخزين المحلي (localStorage) يبقى fallback فورياً
+  }
+
+  function persistFinish(quiz) {
+    if (!canPersist() || !attemptPromises[quiz.id]) { return Promise.resolve(false); }
+    return attemptPromises[quiz.id]
+      .then(function (attemptId) { return DLP.api.finishQuizAttempt(attemptId); })
+      .then(function () { return true; })
+      .catch(function () { return false; });
+  }
+
+  function discardAttempt(quizId) { delete attemptPromises[quizId]; }
+
+  /* ---------------------------------------------------------------------- */
+  /* تصحيح عن بُعد للمحتوى القادم من القاعدة (DATA_SOURCE==='database') —     */
+  /* answer/pairs[].right/items الصحيحة غير متوفرة أبداً محلياً لهذا المحتوى  */
+  /* (محجوبة عمداً على مستوى العمود)، فالتصحيح المحلي الفوري (core/quiz.js)  */
+  /* لا يعمل عليه؛ نستبدله هنا بتصحيح خادمي (RPC) لمستخدم مسجَّل عبر         */
+  /* save_quiz_answer (يحفظ أيضاً)، أو check_answer لغير المسجَّل (بلا حفظ،   */
+  /* بلا كشف بنك الإجابات — نفس مستوى الكشف الحالي في الوضع الثابت تماماً).  */
+  /* المحتوى الثابت (data/subjects/*.js) يبقى يستخدم core/quiz.js كما هو    */
+  /* تماماً بلا أي تغيير — الفرع هنا لا يُفعَّل إلا حين remoteMode() صحيحة.   */
+  /* ---------------------------------------------------------------------- */
+
+  function remoteMode() {
+    return !!(DLP.store && typeof DLP.store.dataSource === 'function' && DLP.store.dataSource() === 'database');
+  }
+
+  /** يُستدعى فقط حين remoteMode() — يحدّد صح/خطأ عبر RPC، ويخزّن النتيجة (+كشف
+   * الإجابة لمستخدم مسجَّل) في state.remote[question.id]، ثم يُحدّث العرض. */
+  function checkRemote(quiz, question, state, root) {
+    var existing = state.remote[question.id];
+    if (existing && existing.pending) { return Promise.resolve(); }
+    state.remote[question.id] = { pending: true };
+    refresh(root, state);
+
+    var serverResponse = toServerResponse(question, state.responses[question.id]);
+    var gradePromise;
+    if (question.type === 'open') {
+      gradePromise = Promise.resolve(false); // لا تصحيح آلي لسؤال مفتوح — فقط كشف لاحقاً
+    } else if (canPersist()) {
+      gradePromise = ensureAttempt(quiz).then(function (attemptId) {
+        return DLP.api.saveQuizAnswer(attemptId, question.id, serverResponse);
+      });
+    } else if (DLP.api && typeof DLP.api.checkAnswer === 'function') {
+      gradePromise = DLP.api.checkAnswer(question.id, serverResponse);
+    } else {
+      gradePromise = Promise.reject(new Error('DLP.api.checkAnswer غير متاح'));
+    }
+
+    return gradePromise.then(function (isCorrect) {
+      state.checked[question.id] = true;
+      state.remote[question.id] = { pending: false, correct: !!isCorrect };
+      if (canPersist() && DLP.api && typeof DLP.api.revealQuestionAnswer === 'function') {
+        return DLP.api.revealQuestionAnswer(question.id).then(function (revealed) {
+          state.remote[question.id].revealed = revealed;
+        }).catch(function () { /* تجاهل بهدوء — يبقى صح/خطأ معروفاً بلا تفاصيل الإجابة */ });
+      }
+    }).catch(function () {
+      // فشل شبكة/تحقق — لا نُبقي السؤال معلَّقاً للأبد؛ يعود قابلاً لإعادة المحاولة
+      delete state.remote[question.id];
+    }).then(function () {
+      save(state);
+      refresh(root, state);
+    });
+  }
+
+  /** نتيجة التصحيح لسؤال واحد بشكل موحَّد بصرف النظر عن مصدر البيانات —
+   * {correct, correctAnswer} كـ DLP.quiz.grade() تماماً في الوضع الثابت،
+   * أو مبنية من state.remote[]/الإجابة المكشوفة في الوضع القادم من القاعدة. */
+  function gradedFor(state, question) {
+    if (remoteMode()) {
+      var r = state.remote[question.id];
+      if (!r || r.pending) { return null; }
+      return { correct: r.correct, correctAnswer: correctAnswerFromRevealed(question, r.revealed) };
+    }
+    return state.checked[question.id] ? DLP.quiz.grade(question, state.responses[question.id]) : null;
+  }
+
+  /** الإجابة الصحيحة بصيغة عرض من بيانات reveal_question_answer (مستخدم مسجَّل فقط) —
+   * تعيد نصاً إرشادياً لتسجيل الدخول إن لم تتوفر (زائر غير مسجَّل، أو فشل الكشف). */
+  function correctAnswerFromRevealed(question, revealed) {
+    if (!revealed) { return t('quiz.signInToReveal'); }
+    switch (question.type) {
+      case 'mcq':
+        var correctOption = (revealed.options || []).filter(function (o) { return o.is_correct; })[0];
+        return correctOption ? correctOption.label : '';
+      case 'tf': return revealed.answer ? t('quiz.true') : t('quiz.false');
+      case 'fill': return Array.isArray(revealed.answer) ? revealed.answer[0] : revealed.answer;
+      case 'match':
+        return (revealed.pairs || []).map(function (p) { return p.left + ' ← ' + p.right; }).join(' | ');
+      case 'order': return (revealed.items || []).join(' ← ');
+      default: return '';
+    }
+  }
+
+  /** هل تحمل response قيمة صالحة لهذا النوع — بمعزل عن معرفة الإجابة الصحيحة،
+   * بخلاف DLP.quiz.grade() التي تحتاج question.answer/pairs/items الحقيقية.
+   * تُستخدم فقط لتحديد "answered" في remoteScore، لا لتحديد "correct" أبداً —
+   * الصحة تبقى قادمة حصراً من الخادم (state.remote[].correct). */
+  function hasResponse(question, response) {
+    if (response === null || response === undefined || response === '') { return false; }
+    switch (question.type) {
+      case 'match':
+        var pairCount = Array.isArray(question.pairsLeft) ? question.pairsLeft.length
+          : (question.pairs ? question.pairs.length : 0);
+        return Array.isArray(response) && response.filter(function (v) { return v; }).length === pairCount;
+      case 'order':
+        return Array.isArray(response) && response.length === (question.items ? question.items.length : 0);
+      case 'fill':
+      case 'open':
+        return String(response).trim() !== '';
+      default:
+        return true; // mcq/tf: أي قيمة غير فارغة كافية لاعتبارها "أُجيبت"
+    }
+  }
+
+  /** نتيجة الاختبار الكلية للمحتوى القادم من القاعدة. "answered"/"gradableAnswered"
+   * تعكسان مجرد اختيار إجابة (hasResponse) — بنفس لحظة تحديث شريط التقدّم في
+   * الوضع الثابت تماماً — أما "correct" فتأتي حصراً من تصحيح خادمي مُحسوم فعلاً
+   * (state.remote[].correct)، لا يمكن معرفتها محلياً قبل استدعاء RPC. بنفس حقول
+   * DLP.quiz.score() تماماً ليستخدمها renderProgress/renderResult بلا تفريع. */
+  function remoteScore(state) {
+    var gradable = 0, correct = 0, answered = 0, gradableAnswered = 0;
+    state.questions.forEach(function (q) {
+      var responded = hasResponse(q, state.responses[q.id]);
+      if (responded) { answered += 1; }
+      if (q.type !== 'open') {
+        gradable += 1;
+        if (responded) { gradableAnswered += 1; }
+        var r = state.remote[q.id];
+        if (r && !r.pending && r.correct) { correct += 1; }
+      }
+    });
+    return {
+      total: gradable, allTotal: state.questions.length,
+      answered: answered, gradableAnswered: gradableAnswered,
+      correct: correct, wrong: gradableAnswered - correct,
+      percent: gradable ? Math.round((correct / gradable) * 100) : 0
+    };
+  }
+
+  function scoreFor(state) { return remoteMode() ? remoteScore(state) : DLP.quiz.score(state.questions, state.responses); }
+
   function createState(quiz) {
     return {
       quiz: quiz,
@@ -19,6 +214,7 @@
       index: 0,
       responses: {},
       checked: {},
+      remote: {}, // questionId -> {pending, correct, revealed?} — الوضع القادم من القاعدة فقط
       finished: false
     };
   }
@@ -74,7 +270,16 @@
       // نقبل فقط إجابات الأسئلة التي ما زالت موجودة في المحتوى الحالي
       var validIds = {};
       quiz.questions.forEach(function (q) { validIds[q.id] = true; });
+      // "checked" في الوضع القادم من القاعدة مرتبط دائماً بنتيجة تصحيح خادمية في
+      // state.remote (غير مُخزَّنة أبداً في localStorage عمداً — الخادم هو مصدر
+      // الحقيقة الوحيد). استعادة "checked" وحدها بعد إعادة تحميل الصفحة تترك
+      // gradedFor() بلا نتيجة رغم أن الواجهة تظن السؤال محسوماً، فتنهار عند
+      // الرسم. الحل: لا نستعيد "checked" في هذا الوضع — يبقى قابلاً لإعادة
+      // "تحقّق" بسيطة وغير مكلفة، بخلاف الإجابات المُختارة (responses) التي
+      // تبقى تُستعاد كما هي في كل الأحوال.
+      var restoreChecked = !remoteMode();
       ['responses', 'checked'].forEach(function (key) {
+        if (key === 'checked' && !restoreChecked) { return; }
         Object.keys(saved[key] || {}).forEach(function (id) {
           if (validIds[id]) { state[key][id] = saved[key][id]; }
         });
@@ -99,6 +304,31 @@
 
   function resetStates() { states = {}; }
 
+  /** يُستدعى بعد نجاح hydrate() لتحديث كائنات الأسئلة المخزَّنة مسبقاً في الذاكرة
+   * بأحدث نسخة قادمة من القاعدة، بلا فقدان أي تقدّم أو تفاعل جارٍ (index/
+   * الإجابات/checked/remote قيد الانتظار) — بخلاف استبدال الحالة بالكامل الذي
+   * كان يقطع الرابط بين وعد check() الجاري وحالته إن نجحت hydrate() في تلك
+   * اللحظة بالذات (سباق حقيقي لوحظ عبر CI: سؤال بقي "جارٍ التحقق" للأبد).
+   * الاستبدال بالمعرّف آمن لأن ترتيب الأسئلة نفسه مضمون التطابق بين المصدرين
+   * (questionSeq() في api.js تُرتّب أسئلة القاعدة بنفس تسلسل الملفات الثابتة). */
+  function refreshQuestionObjects(freshQuiz) {
+    var state = states[freshQuiz.id];
+    if (!state) { return; }
+    var byId = {};
+    freshQuiz.questions.forEach(function (q) { byId[q.id] = q; });
+    state.quiz = freshQuiz;
+    state.questions = state.questions.map(function (q) { return byId[q.id] || q; });
+  }
+
+  /** تُطبَّق على كل اختبار محفوظ حالياً في الذاكرة عبر كل المواد — تُستدعى مرة
+   * واحدة من app.js بعد نجاح hydrate(). */
+  function refreshAllQuestionObjects() {
+    if (!DLP.store || typeof DLP.store.subjects !== 'function') { return; }
+    DLP.store.subjects().forEach(function (subject) {
+      (subject.quizzes || []).forEach(refreshQuestionObjects);
+    });
+  }
+
   function current(state) { return state.questions[state.index]; }
 
   /* ------------------------- رسم أنواع الأسئلة ------------------------- */
@@ -106,14 +336,27 @@
   function renderMcq(state, question) {
     var response = state.responses[question.id];
     var checked = state.checked[question.id];
-    var graded = checked ? DLP.quiz.grade(question, response) : null;
+    var remote = remoteMode();
+    var graded = checked ? gradedFor(state, question) : null;
+    var revealed = remote && state.remote[question.id] ? state.remote[question.id].revealed : null;
+    var correctIndex = remote
+      ? (revealed && Array.isArray(revealed.options)
+        ? (revealed.options.filter(function (o) { return o.is_correct; })[0] || {}).position
+        : null)
+      : question.answer;
+    var knowCorrect = correctIndex !== null && correctIndex !== undefined;
     return '<div class="opt-list" role="group" aria-label="' + esc(t('a11y.optionsGroup')) + '">' +
       question.options.map(function (option, i) {
         var classes = ['opt'];
         var mark = '';
         if (checked) {
-          if (i === question.answer) { classes.push('is-correct'); mark = '✓'; }
-          else if (Number(response) === i && !graded.correct) { classes.push('is-wrong'); mark = '✕'; }
+          if (knowCorrect) {
+            if (i === correctIndex) { classes.push('is-correct'); mark = '✓'; }
+            else if (Number(response) === i && !graded.correct) { classes.push('is-wrong'); mark = '✕'; }
+          } else if (Number(response) === i) {
+            classes.push(graded.correct ? 'is-correct' : 'is-wrong');
+            mark = graded.correct ? '✓' : '✕';
+          }
         }
         return '<button type="button" class="' + classes.join(' ') + '" data-answer="mcq" data-value="' + i + '"' +
           ' aria-pressed="' + (Number(response) === i ? 'true' : 'false') + '"' + (checked ? ' disabled' : '') + '>' +
@@ -128,14 +371,24 @@
   function renderTf(state, question) {
     var response = state.responses[question.id];
     var checked = state.checked[question.id];
+    var remote = remoteMode();
+    var graded = checked ? gradedFor(state, question) : null;
+    var revealed = remote && state.remote[question.id] ? state.remote[question.id].revealed : null;
+    var correctBool = remote ? (revealed ? Boolean(revealed.answer) : null) : Boolean(question.answer);
+    var knowCorrect = correctBool !== null;
     var options = [{ value: 'true', label: t('quiz.true'), bool: true }, { value: 'false', label: t('quiz.false'), bool: false }];
     return '<div class="opt-list" role="group" aria-label="' + esc(t('a11y.trueFalseGroup')) + '">' +
       options.map(function (option, i) {
         var classes = ['opt'];
         var mark = '';
         if (checked) {
-          if (option.bool === Boolean(question.answer)) { classes.push('is-correct'); mark = '✓'; }
-          else if (response === option.value) { classes.push('is-wrong'); mark = '✕'; }
+          if (knowCorrect) {
+            if (option.bool === correctBool) { classes.push('is-correct'); mark = '✓'; }
+            else if (response === option.value) { classes.push('is-wrong'); mark = '✕'; }
+          } else if (response === option.value) {
+            classes.push(graded.correct ? 'is-correct' : 'is-wrong');
+            mark = graded.correct ? '✓' : '✕';
+          }
         }
         return '<button type="button" class="' + classes.join(' ') + '" data-answer="tf" data-value="' + option.value + '"' +
           ' aria-pressed="' + (response === option.value ? 'true' : 'false') + '"' + (checked ? ' disabled' : '') + '>' +
@@ -157,18 +410,32 @@
   function renderMatch(state, question) {
     var response = state.responses[question.id] || [];
     var checked = state.checked[question.id];
-    var options = question.pairs.map(function (pair) { return pair.right; }).slice().sort(function (a, b) {
-      return a.localeCompare(b, 'ar');
-    });
+    var remote = remoteMode();
+    var lefts = remote ? (question.pairsLeft || []) : question.pairs.map(function (p) { return p.left; });
+    var rightsRaw = remote ? (question.pairsRight || []) : question.pairs.map(function (p) { return p.right; });
+    var options = rightsRaw.slice().sort(function (a, b) { return a.localeCompare(b, 'ar'); });
+    var graded = checked ? gradedFor(state, question) : null;
+    var revealed = remote && state.remote[question.id] ? state.remote[question.id].revealed : null;
+    var correctByLeft = null;
+    if (remote && revealed && Array.isArray(revealed.pairs)) {
+      correctByLeft = {};
+      revealed.pairs.forEach(function (p) { correctByLeft[p.left] = p.right; });
+    }
     return '<p class="card-meta">' + esc(t('quiz.matchHint')) + '</p>' +
-      question.pairs.map(function (pair, i) {
+      lefts.map(function (leftText, i) {
         var value = response[i] || '';
         var rowClass = 'match-row';
         if (checked) {
-          rowClass += DLP.utils.normalizeArabic(value) === DLP.utils.normalizeArabic(pair.right) ? ' is-correct' : ' is-wrong';
+          if (!remote) {
+            rowClass += DLP.utils.normalizeArabic(value) === DLP.utils.normalizeArabic(question.pairs[i].right) ? ' is-correct' : ' is-wrong';
+          } else if (correctByLeft) {
+            rowClass += DLP.utils.normalizeArabic(value) === DLP.utils.normalizeArabic(correctByLeft[leftText] || '') ? ' is-correct' : ' is-wrong';
+          } else {
+            rowClass += graded.correct ? ' is-correct' : (value ? ' is-wrong' : '');
+          }
         }
         return '<div class="' + rowClass + '">' +
-          '<span class="match-left" id="ml-' + esc(question.id) + '-' + i + '">' + esc(pair.left) + '</span>' +
+          '<span class="match-left" id="ml-' + esc(question.id) + '-' + i + '">' + esc(leftText) + '</span>' +
           '<select class="match-select" data-answer="match" data-row="' + i + '"' +
             ' aria-labelledby="ml-' + esc(question.id) + '-' + i + '"' + (checked ? ' disabled' : '') + '>' +
             '<option value="">' + esc(t('quiz.choose')) + '</option>' +
@@ -183,11 +450,18 @@
   function renderOrder(state, question) {
     var response = state.responses[question.id] || question.items.slice();
     var checked = state.checked[question.id];
+    var remote = remoteMode();
+    var graded = checked ? gradedFor(state, question) : null;
+    var revealed = remote && state.remote[question.id] ? state.remote[question.id].revealed : null;
+    var correctItems = remote ? (revealed && Array.isArray(revealed.items) ? revealed.items : null) : question.items;
     return '<p class="card-meta">' + esc(t('quiz.orderHint')) + '</p>' +
       '<ol class="order-list">' +
         response.map(function (item, i) {
           var itemClass = 'order-item';
-          if (checked) { itemClass += item === question.items[i] ? ' is-correct' : ' is-wrong'; }
+          if (checked) {
+            if (correctItems) { itemClass += item === correctItems[i] ? ' is-correct' : ' is-wrong'; }
+            else { itemClass += graded.correct ? ' is-correct' : ' is-wrong'; }
+          }
           return '<li class="' + itemClass + '">' +
             '<span class="pos" aria-hidden="true">' + (i + 1) + '</span>' +
             '<span class="txt">' + esc(item) + '</span>' +
@@ -215,10 +489,17 @@
 
   /* ------------------------- رسم الاختبار ------------------------- */
 
-  /** معايير التقييم الذاتي لسؤال مفتوح (سيناريو/مقالي) — نقاط + كلمات مفتاحية إرشادية. */
-  function renderRubric(question) {
-    var points = question.rubric || [];
-    if (!points.length) { return '<div><b>' + esc(t('quiz.explanation')) + ':</b> ' + esc(question.explanation || '') + '</div>'; }
+  /** معايير التقييم الذاتي لسؤال مفتوح (سيناريو/مقالي) — نقاط + كلمات مفتاحية إرشادية.
+   * revealedData (الوضع القادم من القاعدة فقط، لمستخدم مسجَّل): rubric/explanation
+   * تأتي منها بدل question.rubric/explanation (محجوبتان دائماً على مستوى العمود). */
+  function renderRubric(question, revealedData) {
+    var remote = remoteMode();
+    var points = remote ? ((revealedData && revealedData.rubric) || []) : (question.rubric || []);
+    var explanation = remote ? (revealedData ? revealedData.explanation : null) : question.explanation;
+    if (!points.length) {
+      if (remote && !revealedData) { return '<div>' + esc(t('quiz.signInToReveal')) + '</div>'; }
+      return '<div><b>' + esc(t('quiz.explanation')) + ':</b> ' + esc(explanation || '') + '</div>';
+    }
     return '<ol class="detail-list">' +
       points.map(function (point) {
         var keywords = point.keywords && point.keywords.length
@@ -233,21 +514,29 @@
     if (!question) {
       return '<div class="empty-state"><p>' + esc(t('quiz.noneAtLevel')) + '</p></div>';
     }
+    var remote = remoteMode();
+    var pending = remote && state.remote[question.id] && state.remote[question.id].pending;
     var checked = state.checked[question.id];
     var isOpen = question.type === 'open';
-    var graded = checked ? DLP.quiz.grade(question, state.responses[question.id]) : null;
+    var graded = checked ? gradedFor(state, question) : null;
+    var revealedData = remote && state.remote[question.id] ? state.remote[question.id].revealed : null;
 
     var feedbackClass = '';
     var feedbackBody = '';
-    if (checked) {
+    if (pending) {
+      feedbackClass = 'info show';
+      feedbackBody = '<div class="fb-title">⏳ ' + esc(t('quiz.checking')) + '</div>';
+    } else if (checked) {
       if (isOpen) {
         feedbackClass = 'info show';
-        feedbackBody = '<div class="fb-title">📋 ' + esc(t('quiz.openReveal')) + '</div>' + renderRubric(question);
+        feedbackBody = '<div class="fb-title">📋 ' + esc(t('quiz.openReveal')) + '</div>' + renderRubric(question, revealedData);
       } else {
+        var explanationText = remote ? (revealedData && revealedData.explanation) : question.explanation;
         feedbackClass = graded.correct ? 'ok show' : 'bad show';
         feedbackBody = '<div class="fb-title">' + (graded.correct ? '✓ ' + esc(t('quiz.correct')) : '✕ ' + esc(t('quiz.wrong'))) + '</div>' +
           (graded.correct ? '' : '<div class="fb-answer">' + esc(t('quiz.correctAnswer')) + ': ' + esc(graded.correctAnswer) + '</div>') +
-          '<div><b>' + esc(t('quiz.explanation')) + ':</b> ' + esc(question.explanation) + '</div>';
+          (explanationText ? '<div><b>' + esc(t('quiz.explanation')) + ':</b> ' + esc(explanationText) + '</div>'
+            : (remote ? '<div>' + esc(t('quiz.signInToReveal')) + '</div>' : ''));
       }
     }
 
@@ -264,7 +553,7 @@
   }
 
   function renderProgress(state) {
-    var score = DLP.quiz.score(state.questions, state.responses);
+    var score = scoreFor(state);
     var percent = state.questions.length ? Math.round((score.answered / state.questions.length) * 100) : 0;
     return '<div class="progress-meta">' +
         '<span>' + esc(t('quiz.progress')) + ': ' + score.answered + '/' + state.questions.length + '</span>' +
@@ -278,7 +567,7 @@
 
   function renderResult(state) {
     if (!state.finished) { return ''; }
-    var score = DLP.quiz.score(state.questions, state.responses);
+    var score = scoreFor(state);
     return '<div class="quiz-result">' +
       '<div class="score-big">' + score.correct + ' / ' + score.total + ' (' + score.percent + esc(t('quiz.percent')) + ')</div>' +
       '<div class="score-sub">' + esc(t('quiz.result')) + '</div>' +
@@ -296,11 +585,13 @@
     var question = current(state);
     var isLast = state.index === state.questions.length - 1;
     var checkLabel = question && question.type === 'open' ? t('quiz.reveal') : t('quiz.check');
+    var pending = question && remoteMode() && state.remote[question.id] && state.remote[question.id].pending;
     return '' +
       '<button class="btn btn-ghost btn-sm" type="button" data-quiz-action="prev"' +
         (state.index === 0 ? ' disabled' : '') + '>→ ' + esc(t('quiz.prev')) + '</button>' +
       '<button class="btn btn-primary btn-sm" type="button" data-quiz-action="check"' +
-        (!question || state.checked[question.id] ? ' disabled' : '') + '>' + esc(checkLabel) + '</button>' +
+        (!question || state.checked[question.id] || pending ? ' disabled' : '') + '>' +
+        (pending ? esc(t('quiz.checking')) : esc(checkLabel)) + '</button>' +
       '<span class="spacer"></span>' +
       (isLast
         ? '<button class="btn btn-gold btn-sm" type="button" data-quiz-action="finish">' + esc(t('quiz.finish')) + '</button>'
@@ -427,13 +718,21 @@
         var action = target.dataset.quizAction;
         if (action === 'next' && state.index < state.questions.length - 1) { state.index += 1; }
         else if (action === 'prev' && state.index > 0) { state.index -= 1; }
-        else if (action === 'check' && question) { state.checked[question.id] = true; }
-        else if (action === 'finish') { state.finished = true; }
+        else if (action === 'check' && question) {
+          if (remoteMode()) {
+            checkRemote(context.quiz, question, state, context.root); // غير متزامن — يحفظ/يرسم بنفسه
+          } else {
+            state.checked[question.id] = true;
+            persistAnswer(context.quiz, question, state.responses[question.id]);
+          }
+        }
+        else if (action === 'finish') { state.finished = true; persistFinish(context.quiz); }
         var wiped = false;
         if (action === 'retry' || action === 'clear') {
           var difficulty = action === 'clear' ? 'all' : state.difficulty;
           var lecture = action === 'clear' ? 'all' : state.lecture;
           clearSaved(context.quiz.id);
+          discardAttempt(context.quiz.id); // محاولة خادمية جديدة تبدأ مع إجابة جديدة، لا استكمال القديمة
           states[context.quiz.id] = createState(context.quiz);
           states[context.quiz.id].difficulty = difficulty;
           states[context.quiz.id].lecture = lecture;
@@ -448,7 +747,8 @@
       }
 
       // اختيار إجابة
-      if (!question || state.checked[question.id]) { return; }
+      var isPending = remoteMode() && state.remote[question.id] && state.remote[question.id].pending;
+      if (!question || state.checked[question.id] || isPending) { return; }
       var kind = target.dataset.answer;
       if (kind === 'mcq') { state.responses[question.id] = Number(target.dataset.value); }
       else if (kind === 'tf') { state.responses[question.id] = target.dataset.value; }
@@ -495,6 +795,16 @@
 
   DLP.quizView = {
     renderSection: renderSection, renderQuiz: renderQuiz, bind: bind,
-    resetStates: resetStates, clearSaved: clearSaved
+    resetStates: resetStates, clearSaved: clearSaved,
+    refreshAllQuestionObjects: refreshAllQuestionObjects,
+    /** للاختبارات فقط — لا يُستخدم من أي مكوّن آخر. */
+    __test: {
+      canPersist: canPersist, toServerResponse: toServerResponse, discardAttempt: discardAttempt,
+      persistAnswer: persistAnswer, persistFinish: persistFinish, ensureAttempt: ensureAttempt,
+      remoteMode: remoteMode, checkRemote: checkRemote, gradedFor: gradedFor,
+      correctAnswerFromRevealed: correctAnswerFromRevealed, remoteScore: remoteScore,
+      hasResponse: hasResponse, scoreFor: scoreFor, createState: createState,
+      getState: getState, refresh: refresh, refreshQuestionObjects: refreshQuestionObjects
+    }
   };
 })(typeof window !== 'undefined' ? window : globalThis);

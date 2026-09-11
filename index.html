@@ -9,7 +9,7 @@
 <title>القيادة الرقمية — الدبلوم العالي المهني في القيادة الرقمية</title>
 
 <!-- سياسة أمان المحتوى: سكربتات من المصدر نفسه فقط، والخطوط من Google Fonts حصراً -->
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' https://kotbarynxzyhxhzribpf.supabase.co; object-src 'none'; base-uri 'none'; form-action 'none'">
 
 <!-- وسوم المشاركة -->
 <meta property="og:type" content="website">
@@ -55,6 +55,7 @@
 <script src="data/config/strings.js"></script>
 <script src="data/config/contact.js"></script>
 <script src="data/config/about.js"></script>
+<script src="data/config/supabase.js"></script>
 
 <!-- ============ طبقة المحتوى (بيانات المواد) ============ -->
 <script src="data/subjects/index.js"></script>
@@ -67,6 +68,13 @@
 <!-- ============ النواة ============ -->
 <script src="assets/js/core/utils.js"></script>
 <script src="assets/js/core/i18n.js"></script>
+
+<!-- مكتبة عميل Supabase محمَّلة محلياً (لا CDN، بسبب script-src 'self' في CSP) -->
+<script src="assets/vendor/supabase-js.min.js"></script>
+<script src="assets/js/core/supabase.js"></script>
+<script src="assets/js/core/api.js"></script>
+<script src="assets/js/core/auth.js"></script>
+
 <script src="assets/js/core/store.js"></script>
 <script src="assets/js/core/search.js"></script>
 <script src="assets/js/core/quiz.js"></script>
@@ -83,6 +91,9 @@
 <script src="assets/js/components/library.js"></script>
 <script src="assets/js/components/assistant.js"></script>
 <script src="assets/js/components/certificates.js"></script>
+<script src="assets/js/components/dashboard.js"></script>
+<script src="assets/js/components/admin/index.js"></script>
+<script src="assets/js/components/admin/questions.js"></script>
 
 <!-- ============ التشغيل ============ -->
 <script src="assets/js/app.js"></script>

@@ -17,6 +17,7 @@
         return { href: '#/subject/' + subject.id, icon: subject.icon || '📘', label: subject.shortTitle || subject.title, title: subject.title };
       }),
       more: [
+        { href: '#/dashboard', icon: '📊', label: t('nav.dashboard') },
         { href: '#/library', icon: '📚', label: t('nav.library'), badge: t('common.comingSoon') },
         { href: '#/assistant', icon: '🤖', label: t('nav.assistant'), badge: t('common.comingSoon') },
         { href: '#/certificates', icon: '🎓', label: t('nav.certificates'), badge: t('common.comingSoon') },
@@ -32,7 +33,7 @@
     // الشريط الجانبي (Desktop) يعرض القائمة كاملة؛ شريط الهيدر العلوي يبقى مختصراً على
     // الشاشات الواسعة (الرئيسية + المواد + من نحن) لتفادي الازدواج، مع بقاء القائمة
     // الكاملة في قائمة الجوال المنسدلة (نفس <nav id="mainNav">).
-    var extraHrefs = ['#/library', '#/assistant', '#/certificates'];
+    var extraHrefs = ['#/dashboard', '#/library', '#/assistant', '#/certificates'];
     var links = [nav.home].concat(nav.subjects).concat(nav.more
       .filter(function (item) { return item.href !== '#/about?focus=contact'; })
       .map(function (item) {

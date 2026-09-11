@@ -101,6 +101,24 @@
     paint(DLP.certificatesView.render());
   }
 
+  function renderDashboard() {
+    setTitle([t('nav.dashboard')], t('dashboard.intro'));
+    paint(DLP.dashboardView.render());
+    DLP.dashboardView.bind();
+  }
+
+  function renderAdmin() {
+    setTitle([t('admin.title')], t('admin.intro'));
+    paint(DLP.adminView.render());
+    DLP.adminView.bind();
+  }
+
+  function renderAdminQuiz(params) {
+    setTitle([t('admin.questionsTitle'), t('admin.title')], t('admin.intro'));
+    paint(DLP.adminQuestionsView.render());
+    DLP.adminQuestionsView.bind(params.quizId);
+  }
+
   /** تمرير التركيز إلى عنصر محدّد عبر ?focus= */
   function focusTarget(query) {
     if (!query || !query.focus) { return; }
@@ -121,13 +139,23 @@
     '</div>' + DLP.layout.endActions() + '</div>');
   }
 
-  function init() {
-    // بناء الهيكل الثابت مرة واحدة
+  /** يعيد رسم الهيكل الثابت (Header/Sidebar/Footer/BottomNav) وإعادة ربط أحداثه. */
+  function renderShell() {
     el('shellHeader').innerHTML = DLP.layout.renderHeader();
     el('shellFooter').innerHTML = DLP.layout.renderFooter();
     el('shellSidebar').outerHTML = DLP.layout.renderSidebar();
     el('shellBottomNav').innerHTML = DLP.layout.renderBottomNav();
+    // ملاحظة: bindShell() تُستدعى أيضاً لاحقاً عند نجاح hydrate() (انظر init())،
+    // فتُعاد ربط بعض المستمعات على مستوى document/window (scroll-top، fab) مرتين
+    // — تأثير عديم الضرر (toggle/scroll idempotent) لا يستحق تعقيد فصل الدالة.
     DLP.layout.bindShell();
+  }
+
+  function init() {
+    // رسم فوري بالبيانات المتاحة حالياً (ثابتة افتراضياً) — لا ننتظر الشبكة أبداً
+    // قبل أول عرض؛ صفحة فارغة لثوانٍ ريثما يُحسم اتصال Supabase تجربة أسوأ من عرض
+    // فوري ثم تحديث لاحق صامت عند نجاح hydrate() (انظر أسفله).
+    renderShell();
 
     DLP.router.add('/', renderHome);
     DLP.router.add('/search', renderSearch);
@@ -135,10 +163,38 @@
     DLP.router.add('/library', renderLibrary);
     DLP.router.add('/assistant', renderAssistant);
     DLP.router.add('/certificates', renderCertificates);
+    DLP.router.add('/dashboard', renderDashboard);
+    DLP.router.add('/admin', renderAdmin);
+    DLP.router.add('/admin/quiz/:quizId', renderAdminQuiz);
     DLP.router.add('/subject/:id', renderSubject);
     DLP.router.add('/subject/:id/:section', renderSubject);
     DLP.router.setNotFound(renderNotFound);
     DLP.router.start();
+
+    // محاولة ملء البيانات من Supabase في الخلفية بمعزل تام عن العرض الأول — تسقط
+    // بهدوء على البيانات الثابتة عند أي فشل/بطء/غياب اتصال (انظر core/store.js
+    // hydrate()، بما فيها مهلتها الداخلية).
+    DLP.store.hydrate().then(function (changed) {
+      if (!changed) { return; }
+      // حالة اختبار مخزَّنة في الذاكرة (quiz-view.js) قد تشير إلى كائنات أسئلة من
+      // البيانات الثابتة القديمة (لو كان المستخدم قد فتح اختباراً قبل نجاح hydrate) —
+      // بلا هذا التحديث تبقى تلك الكائنات القديمة (بلا pairsLeft/pairsRight مثلاً)
+      // بينما remoteMode() أصبحت true عالمياً، فينكسر رسم بعض أنواع الأسئلة بصمت.
+      // نُحدِّث كائنات الأسئلة بالمعرّف فقط (ترتيبها مضمون التطابق) — تُستخدَم فوراً
+      // في أي رسم لاحق (renderQuiz/renderQuestion يُستدعيان طبيعياً مع أي تفاعل قادم).
+      if (DLP.quizView && typeof DLP.quizView.refreshAllQuestionObjects === 'function') {
+        DLP.quizView.refreshAllQuestionObjects();
+      }
+      // عمداً: لا نُعيد رسم الهيكل/المسار الحالي فوراً هنا. جرّبنا ذلك (renderShell +
+      // router.navigate) وكشف CI حقيقي سباقاً خطيراً: إعادة الرسم القسرية تستبدل DOM
+      // بأكمله حتى لو كان المستخدم يتفاعل مع اختبار في تلك اللحظة بالذات (يختار من
+      // قائمة منسدلة، أو بانتظار نتيجة "تحقّق" قيد التنفيذ) — يقطع مقابض العناصر
+      // القديمة ويُفسد التفاعل الجاري بصمت. بما أن render* كلها تُستدعى طبيعياً مع أي
+      // إجراء تالٍ (تالٍ/تحقّق/تصفية)، تحديث البيانات وحده (أعلاه) يكفي لضمان صحة أي
+      // رسم لاحق؛ الصفحة المفتوحة حالياً تبقى بصرياً كما هي حتى أول تفاعل تالٍ من
+      // المستخدم، والتنقّلات الجديدة (لصفحة أخرى أو لاحقاً لنفس الصفحة) تُبنى دائماً
+      // من DLP.data المُحدَّثة فعلياً.
+    });
   }
 
   if (document.readyState === 'loading') { document.addEventListener('DOMContentLoaded', init); }

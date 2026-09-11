@@ -564,6 +564,24 @@ ul{list-style:none}
 .soon-card p{color:var(--muted);font-size:.95rem;max-width:480px;margin:0 auto 6px}
 .badge-soon{background:var(--turquoise-100);color:var(--navy);border-color:var(--turquoise-300)}
 
+/* ---------- لوحة الطالب (Dashboard) ---------- */
+.dashboard-account{
+  display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;
+  background:var(--paper);border:1px solid var(--line);border-radius:var(--radius);
+  padding:12px 16px;margin-bottom:16px
+}
+.dashboard-account:empty{display:none}
+.progress-cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:14px}
+.progress-card{
+  background:var(--ivory);border:1px solid var(--line);border-radius:var(--radius);padding:16px
+}
+.progress-card h3{font-size:1rem;color:var(--navy);font-weight:800;margin-bottom:8px}
+.data-table{width:100%;border-collapse:collapse;margin-top:10px}
+.data-table th,.data-table td{
+  text-align:start;padding:9px 10px;border-bottom:1px solid var(--line);font-size:.9rem
+}
+.data-table th{color:var(--navy);font-weight:800}
+
 /* ---------- الطباعة ---------- */
 @media print{
   .site-header,.search-bar,.fab-top,.page-end-actions,.sectionbar,.quiz-toolbar,.quiz-foot,
