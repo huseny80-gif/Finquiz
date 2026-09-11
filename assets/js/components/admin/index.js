@@ -222,7 +222,8 @@
     { key: 'quizzes', labelKey: 'admin.hub.quizzes', icon: '❓' },
     { key: 'references', labelKey: 'admin.hub.references', icon: '📖' },
     { key: 'resources', labelKey: 'admin.hub.resources', icon: '🔗' },
-    { key: 'updates', labelKey: 'admin.hub.updates', icon: '📣' }
+    { key: 'updates', labelKey: 'admin.hub.updates', icon: '📣' },
+    { key: 'files', labelKey: 'admin.hub.files', icon: '📎' }
   ];
 
   function renderHubBody(subjectId, subjectRow) {

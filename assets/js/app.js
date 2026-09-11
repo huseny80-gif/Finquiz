@@ -130,7 +130,7 @@
   var ADMIN_SECTION_VIEWS = {
     lectures: 'adminLecturesView', summaries: 'adminSummariesView', assignments: 'adminAssignmentsView',
     quizzes: 'adminQuizzesView', references: 'adminReferencesView', resources: 'adminResourcesView',
-    updates: 'adminUpdatesView'
+    updates: 'adminUpdatesView', files: 'adminFilesView'
   };
 
   function renderAdminSection(params) {

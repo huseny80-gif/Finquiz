@@ -451,7 +451,7 @@ function group(name) { console.log('\n▶ ' + name); }
     assert(!(await page.$('.admin-hub-card')), 'لا يجوز ظهور أي رابط إدارة فرعي قبل تسجيل الدخول');
   });
 
-  for (const section of ['lectures', 'summaries', 'assignments', 'quizzes', 'references', 'resources', 'updates']) {
+  for (const section of ['lectures', 'summaries', 'assignments', 'quizzes', 'references', 'resources', 'updates', 'files']) {
     await test('مدير ' + section + ' الإداري (Phase D) يدعو لتسجيل الدخول بلا كشف أي بيانات ولا أخطاء Console', async () => {
       const errBefore = consoleErrors.length;
       await page.goto(base + '#/admin/subject/ai-data/' + section, { waitUntil: 'domcontentloaded' });

@@ -595,6 +595,13 @@
     });
   }
 
+  /** يحلّ رابط عرض صفّ files لواجهة الإدارة (نفس منطق mapFile بالضبط) — يُستخدَم
+   * فقط لعرض رابط "فتح" في لوحة الإدارة؛ لا صلة له بمسار القراءة العام
+   * (fetchSubjectContent) الذي يبني هذا الرابط ضمن DLP.data مباشرة. */
+  function adminResolveFileUrl(fileRow) {
+    return requireClient().then(function (c) { return mapFile(c, fileRow).url; });
+  }
+
   DLP.api = {
     isReady: isReady,
     fetchAllContent: fetchAllContent,
@@ -621,7 +628,8 @@
     buildStoragePath: buildStoragePath,
     validateFileForUpload: validateFileForUpload,
     adminUploadFile: adminUploadFile,
-    adminDeleteFile: adminDeleteFile
+    adminDeleteFile: adminDeleteFile,
+    adminResolveFileUrl: adminResolveFileUrl
   };
 
   if (typeof module !== 'undefined' && module.exports) { module.exports = DLP.api; }

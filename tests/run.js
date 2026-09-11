@@ -1987,6 +1987,71 @@ testAsync('adminDeleteFile(): ملف قديم بلا storage_path (رابط ثا
   equal(seedRows.files.length, 0, 'صفّ files يجب أن يُحذَف رغم ذلك');
 });
 
+/* -------------------- admin/files.js — إدارة ملفات مادة (Phase C) -------------------- */
+group('admin/files.js — واجهة رفع/ربط/حذف الملفات الإدارية');
+
+test('adminFilesView.render(): حالة "قريباً" بلا DLP.auth', () => {
+  const sbDLP = loadAdminLayer('assets/js/components/admin/files.js', {});
+  const html = sbDLP.adminFilesView.render();
+  assert(html.indexOf('soon-card') !== -1, 'يجب عرض بطاقة قريباً بلا DLP.auth');
+  assert(html.indexOf('data-admin-action="sign-in"') === -1, 'لا يجوز عرض زر تسجيل دخول بلا اتصال');
+});
+
+test('adminFilesView.render(): دعوة تسجيل الدخول حين الاتصال جاهز بلا مستخدم، بلا كشف أي جدول', () => {
+  const sbDLP = loadAdminLayer('assets/js/components/admin/files.js', {
+    fakeAuth: { isAvailable: () => true, onChange: (cb) => { cb(null); return () => {}; } }
+  });
+  const html = sbDLP.adminFilesView.render();
+  assert(html.indexOf('data-admin-action="sign-in"') !== -1, 'زر تسجيل الدخول يجب أن يظهر');
+  assert(html.indexOf('data-table') === -1, 'لا يجوز ظهور أي جدول قبل تسجيل الدخول');
+});
+
+test('deriveCategory(): يشتق مجلّد Storage الصحيح من نوع الربط، وresources افتراضياً', () => {
+  const sbDLP = loadAdminLayer('assets/js/components/admin/files.js', {});
+  const d = sbDLP.adminFilesView.__test.deriveCategory;
+  equal(d('lecture_id'), 'lectures', 'محاضرة → lectures');
+  equal(d('summary_id'), 'summaries', 'ملخّص → summaries');
+  equal(d('assignment_id'), 'assignments', 'واجب → assignments');
+  equal(d(''), 'resources', 'بلا ربط → resources افتراضياً');
+  equal(d(undefined), 'resources', 'قيمة غير معروفة → resources افتراضياً');
+});
+
+test('targetTypeOf(): يحدّد أي عمود ربط مملوء فعلياً بأولوية محاضرة←ملخّص←واجب', () => {
+  const sbDLP = loadAdminLayer('assets/js/components/admin/files.js', {});
+  const f = sbDLP.adminFilesView.__test.targetTypeOf;
+  equal(f({ lecture_id: 'l1', summary_id: null, assignment_id: null }), 'lecture_id');
+  equal(f({ lecture_id: null, summary_id: 's1', assignment_id: null }), 'summary_id');
+  equal(f({ lecture_id: null, summary_id: null, assignment_id: 'a1' }), 'assignment_id');
+  equal(f({ lecture_id: null, summary_id: null, assignment_id: null }), '', 'بلا أي ربط → نص فارغ (مستوى المادة)');
+});
+
+test('targetLabel(): نص وصفي مطابق لعمود الربط المملوء، أو "مستوى المادة" بلا أي ربط', () => {
+  const sbDLP = loadAdminLayer('assets/js/components/admin/files.js', {});
+  const label = sbDLP.adminFilesView.__test.targetLabel;
+  assert(label({ lecture_id: 'ai-l1' }).indexOf('ai-l1') !== -1, 'يجب أن يظهر معرّف المحاضرة في النص');
+  assert(label({ summary_id: 'ai-s1' }).indexOf('ai-s1') !== -1, 'يجب أن يظهر معرّف الملخّص في النص');
+  assert(label({ assignment_id: 'ai-a1' }).indexOf('ai-a1') !== -1, 'يجب أن يظهر معرّف الواجب في النص');
+  const none = label({});
+  assert(none.indexOf('ai-') === -1, 'بلا أي ربط يجب ألا يظهر أي معرّف');
+});
+
+test('targetPatch(): يملأ عمود ربط واحداً فقط بحسب target_type/target_id، والبقية null دائماً', () => {
+  const sbDLP = loadAdminLayer('assets/js/components/admin/files.js', {});
+  const p = sbDLP.adminFilesView.__test.targetPatch;
+  const withLecture = p({ target_type: 'lecture_id', target_id: 'ai-l3' });
+  equal(withLecture.lecture_id, 'ai-l3', 'العمود المختار يجب أن يحمل القيمة');
+  equal(withLecture.summary_id, null, 'الأعمدة الأخرى يجب أن تبقى null');
+  equal(withLecture.assignment_id, null, 'الأعمدة الأخرى يجب أن تبقى null');
+
+  const none = p({ target_type: '', target_id: '' });
+  equal(none.lecture_id, null, 'بلا اختيار ربط، الكل null');
+  equal(none.summary_id, null, 'بلا اختيار ربط، الكل null');
+  equal(none.assignment_id, null, 'بلا اختيار ربط، الكل null');
+
+  const typeWithoutId = p({ target_type: 'summary_id', target_id: '' });
+  equal(typeWithoutId.summary_id, null, 'نوع ربط بلا معرّف فعلي يجب ألا يُملأ (كلاهما مطلوبان معاً)');
+});
+
 /* -------------------- admin/crud-page.js — مصنع صفحات CRUD عامة (Phase D) -------------------- */
 group('admin/crud-page.js — مصنع CRUD عام (lectures/summaries/assignments/...)');
 
