@@ -35,3 +35,26 @@ jobs:
 
       - name: تشغيل اختبارات المتصفح
         run: npm run test:e2e
+
+  live:
+    name: اختبار حي متصل فعلياً بـ Supabase
+    runs-on: ubuntu-latest
+    # يعمل فقط حين تتوفّر أسرار مستخدم اختبار حقيقي (E2E_LIVE_EMAIL/E2E_LIVE_PASSWORD) —
+    # بدونها يتخطّى tests/e2e.live.js نفسه بهدوء (exit 0)، فهذا الشرط هنا احتياط إضافي
+    # فقط لتفادي تثبيت Playwright بلا داعٍ حين لا تتوفّر الأسرار أصلاً.
+    if: ${{ github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: تثبيت Playwright
+        run: npm install --no-save playwright@1.56.1 && npx playwright install --with-deps chromium
+
+      - name: تشغيل الاختبار الحي المتصل فعلياً بـ Supabase
+        env:
+          E2E_LIVE_EMAIL: ${{ secrets.E2E_LIVE_EMAIL }}
+          E2E_LIVE_PASSWORD: ${{ secrets.E2E_LIVE_PASSWORD }}
+        run: npm run test:e2e:live
