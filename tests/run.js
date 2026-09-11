@@ -913,11 +913,21 @@ function fakeUtils() {
   };
 }
 
+function fakeLocalStorage(initial) {
+  const store = Object.assign({}, initial || {});
+  return {
+    getItem: (k) => (k in store ? store[k] : null),
+    setItem: (k, v) => { store[k] = String(v); },
+    removeItem: (k) => { delete store[k]; }
+  };
+}
+
 function loadQuizViewLayer(options) {
   options = options || {};
   const sandbox = { console, addEventListener() {}, document: null };
   sandbox.window = sandbox;
   sandbox.globalThis = sandbox;
+  sandbox.localStorage = options.fakeLocalStorage || fakeLocalStorage();
   sandbox.DLP = {
     auth: options.fakeAuth, api: options.fakeApi,
     store: options.fakeStore, quiz: options.fakeQuiz,
@@ -1280,6 +1290,42 @@ test('hasResponse(): تطابق منطق "answered" في core/quiz.js لكل ن�
   equal(hasResponse({ type: 'order', items: ['أ', 'ب', 'ج'] }, ['أ', 'ب', 'ج']), true);
   equal(hasResponse({ type: 'match', pairsLeft: ['أ', 'ب'] }, ['1', '']), false, 'صف فارغ في المطابقة يعني عدم الاكتمال');
   equal(hasResponse({ type: 'match', pairsLeft: ['أ', 'ب'] }, ['1', '2']), true);
+});
+
+test('load()/getState(): لا تُستعاد "checked" في الوضع القادم من القاعدة — كانت تُسبِّب انهيار الرسم فعلياً', () => {
+  // اكتُشف عبر CI حقيقي: بعد إعادة تحميل الصفحة (أو عند التنقّل لصفحة اختبار
+  // سبق فتحها)، "checked" تُستعاد من localStorage بينما state.remote (نتيجة
+  // التصحيح الخادمية المرتبطة بها) غير مُخزَّنة إطلاقاً — فتحاول gradedFor()
+  // قراءة correct من نتيجة غير موجودة وتنهار كل عملية الرسم (لا تظهر أي عناصر
+  // إطلاقاً بعدها، ما فسَّر فشل اختبارات لا صلة مباشرة لها بهذا السؤال تحديداً).
+  const quiz = { id: 'rq1', questions: [{ id: 'rq1-1', type: 'mcq', options: ['أ', 'ب'] }] };
+  const saved = JSON.stringify({
+    v: 1, difficulty: 'all', lecture: 'all', index: 0,
+    responses: { 'rq1-1': 1 }, checked: { 'rq1-1': true }, finished: false
+  });
+  const sbDLP = loadQuizViewLayer({
+    fakeStore: fakeStoreDatabase(),
+    fakeQuiz: { filterByDifficulty: (qs) => qs, filterByLecture: (qs) => qs },
+    fakeLocalStorage: fakeLocalStorage({ 'dlp.quiz.rq1': saved })
+  });
+  const state = sbDLP.quizView.__test.getState(quiz);
+  equal(state.responses['rq1-1'], 1, 'يجب استعادة الإجابة المُختارة كما هي');
+  equal(state.checked['rq1-1'], undefined, 'checked يجب ألا تُستعاد في الوضع القادم من القاعدة');
+});
+
+test('load()/getState(): تستعيد checked كالمعتاد في الوضع الثابت (بلا أي تغيير سلوك)', () => {
+  const quiz = { id: 'sq1', questions: [{ id: 'sq1-1', type: 'mcq', options: ['أ', 'ب'] }] };
+  const saved = JSON.stringify({
+    v: 1, difficulty: 'all', lecture: 'all', index: 0,
+    responses: { 'sq1-1': 0 }, checked: { 'sq1-1': true }, finished: false
+  });
+  const sbDLP = loadQuizViewLayer({
+    fakeStore: fakeStoreStatic(),
+    fakeQuiz: { filterByDifficulty: (qs) => qs, filterByLecture: (qs) => qs },
+    fakeLocalStorage: fakeLocalStorage({ 'dlp.quiz.sq1': saved })
+  });
+  const state = sbDLP.quizView.__test.getState(quiz);
+  equal(state.checked['sq1-1'], true, 'checked يجب أن تُستعاد في الوضع الثابت كما كان دائماً');
 });
 
 test('scoreFor(): تُوجِّه للدالة الصحيحة بحسب dataSource (remoteScore مقابل DLP.quiz.score)', () => {

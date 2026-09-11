@@ -305,9 +305,24 @@ function group(name) { console.log('\n▶ ' + name); }
     await open(base + '#/subject/ai-data/quizzes');
     await page.click('.opt[data-value="1"]');
     await page.click('[data-quiz-action="check"]');
+    await page.waitForSelector('.feedback.show');
     await page.reload({ waitUntil: 'domcontentloaded' });
-    await page.waitForSelector('.feedback.show', { timeout: 5000 });
-    assert((await page.textContent('.feedback')).includes('صحيحة'), 'لم تُستعد الإجابة المحفوظة');
+    await page.waitForSelector('.opt');
+    // ملاحظة: عند القراءة من القاعدة (enabled:true ونجاح hydrate())، حالة "تحقّق"
+    // (checked) مرتبطة بنتيجة تصحيح خادمية (state.remote) لا تُخزَّن في
+    // localStorage عمداً — الخادم مصدر الحقيقة الوحيد لصحة الإجابة، فتُطلب
+    // "تحقّق" جديد بسيط بعد إعادة التحميل بدل استعادة نتيجة قديمة. الإجابة
+    // المُختارة نفسها تبقى محفوظة في كل الأحوال. في الوضع الثابت (لا اتصال
+    // بالقاعدة) يبقى السلوك القديم كما هو تماماً: "تحقّق" والتغذية الراجعة
+    // تُستعادان معاً.
+    const dataSource = await page.evaluate(() => window.DLP.store.dataSource());
+    if (dataSource === 'database') {
+      const pressed = await page.getAttribute('.opt[data-value="1"]', 'aria-pressed');
+      assert(pressed === 'true', 'الإجابة المُختارة لم تُستعد بعد إعادة التحميل');
+    } else {
+      await page.waitForSelector('.feedback.show', { timeout: 5000 });
+      assert((await page.textContent('.feedback')).includes('صحيحة'), 'لم تُستعد الإجابة المحفوظة');
+    }
   });
 
   await test('زر «مسح التقدّم» يمسح الحفظ فعلياً', async () => {

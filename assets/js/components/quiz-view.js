@@ -270,7 +270,16 @@
       // نقبل فقط إجابات الأسئلة التي ما زالت موجودة في المحتوى الحالي
       var validIds = {};
       quiz.questions.forEach(function (q) { validIds[q.id] = true; });
+      // "checked" في الوضع القادم من القاعدة مرتبط دائماً بنتيجة تصحيح خادمية في
+      // state.remote (غير مُخزَّنة أبداً في localStorage عمداً — الخادم هو مصدر
+      // الحقيقة الوحيد). استعادة "checked" وحدها بعد إعادة تحميل الصفحة تترك
+      // gradedFor() بلا نتيجة رغم أن الواجهة تظن السؤال محسوماً، فتنهار عند
+      // الرسم. الحل: لا نستعيد "checked" في هذا الوضع — يبقى قابلاً لإعادة
+      // "تحقّق" بسيطة وغير مكلفة، بخلاف الإجابات المُختارة (responses) التي
+      // تبقى تُستعاد كما هي في كل الأحوال.
+      var restoreChecked = !remoteMode();
       ['responses', 'checked'].forEach(function (key) {
+        if (key === 'checked' && !restoreChecked) { return; }
         Object.keys(saved[key] || {}).forEach(function (id) {
           if (validIds[id]) { state[key][id] = saved[key][id]; }
         });
