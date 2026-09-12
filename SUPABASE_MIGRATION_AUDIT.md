@@ -269,7 +269,7 @@ mapAssignment` يُثبّت `files: []` دائماً. أي أن **وضع الق�
 | 3 | إصلاح فجوة عرض الملفات الفارغة في وضع القاعدة (§4.3)؟ | ✅ **نُفِّذت (Phase B)** — انظر `IMPLEMENTATION_REPORT.md`§"المرحلة 10 (Phase B — Storage + File Parity)"؛ `mapFile`/`mapLecture`/`mapSummary`/`mapAssignment` تُحلّ الآن `storage_path`/`external_url`/`public_url` بنفس شكل `DLP.data` النهائي في وضعي الملفات الثابتة والقاعدة. |
 | 4 | بناء لوحة إدارة CRUD كاملة (Phase D)؟ | ✅ **نُفِّذت** — انظر `IMPLEMENTATION_REPORT.md`§"المرحلة 9 (Phase D)" للتفاصيل الكاملة. |
 | 5 | إضافة بريد/كلمة مرور كميزة تسجيل دخول للمستخدمين (لا فقط اختبار CI)؟ | **لا — قرار صريح من المستخدم في Phase B**: Google OAuth يبقى وسيلة الدخول الوحيدة؛ بريد/كلمة مرور يبقى أداة اختبار CI فقط (`tests/e2e.live.js`). |
-| 6 | إنشاء Bucket `course-files` والبدء برفع ملفات فعلي؟ | ✅ **نُفِّذت (Phase B)** — Bucket `course-files` عام (public=true)، 20MB/ملف، أنواع MIME محدودة (مستندات/عروض/صور شائعة، بلا فيديو)؛ 4 سياسات RLS على `storage.objects` (قراءة مفتوحة، كتابة/تعديل/حذف admin فقط عبر `is_admin_or_instructor()`)؛ انظر `010_storage_bucket_and_file_columns.sql` و`IMPLEMENTATION_REPORT.md`§"المرحلة 10". |
+| 6 | إنشاء Bucket `course-files` والبدء برفع ملفات فعلي؟ | ✅ **نُفِّذت (Phase B)**، ثم **صُحِّحت أمنياً (PHASE B.1)** — Bucket كان public=true فاكتُشف أنه يتجاوز `content_read_published` تماماً عند التنزيل الفعلي (موثَّق رسمياً من Supabase). أصبح **private**؛ القراءة عبر `createSignedUrl` محكومة بسياسة RLS جديدة تتحقّق فعلياً من `files.status='published'` أو admin/instructor. 20MB/ملف، أنواع MIME محدودة (بلا فيديو) كما هي. انظر `011_private_bucket_signed_urls.sql` و`IMPLEMENTATION_REPORT.md`§"المرحلة 12 (PHASE B.1)". |
 | 7 | حذف/تعديل `courses`؟ | لا حاجة — الإبقاء عليه كما هو. |
 
 ---

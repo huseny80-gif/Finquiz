@@ -555,3 +555,89 @@ CRUD عام) وadmin/index.js (إدارة المواد + مركز روابط) و
 
 لا إعادة رفع/استبدال ملف موجود، ولا سحب-وإفلات (drag & drop) — خارج نطاق الطلب الصريح "واجهة رفع
 ملفات إدارية" الأساسية؛ يمكن إضافتهما لاحقاً بطلب منفصل.
+
+---
+
+## المرحلة 12 (PHASE B.1 — تصحيح أمني: Bucket عام كان يتجاوز RLS) — 2026-09-12
+
+بطلب صريح من المستخدم بعد مراجعة تقرير Phase B: اكتشاف أن `course-files` (public=true) يتجاوز حماية
+`files.content_read_published` تماماً على مستوى تنزيل الملف الفعلي، بصرف النظر عن حالة صفّه في جدول
+`files`. تأكَّد هذا فعلياً (لا افتراضاً) عبر وثائق Supabase الرسمية: *"When a bucket is designated as
+'Public,' it effectively bypasses access controls for both retrieving and serving files within the
+bucket."* — هذا **اكتشاف صحيح**، وسياسة `course_files_read` على `storage.objects` كانت زخرفية بحتة
+لبَكِت عام: لا تُستشار إطلاقاً عند التنزيل الفعلي عبر مسار `/storage/v1/object/public/...`.
+
+### القرار المعماري
+
+Bucket `course-files` أصبح **private**، والقراءة الفعلية عبر **signed URL** (`createSignedUrl`) لا
+`getPublicUrl`. لم يُعتمَد بديل "كل الملفات public فعلاً" لأن المنصّة تملك مفهوم draft/published صريحاً
+على مستوى جدول `files` منذ البداية (`content_read_published`)، ويجب أن ينطبق الشيء نفسه على تنزيل
+الملف المرتبط، لا فقط على ظهور اسمه في القائمة.
+
+### الهجرة `011_private_bucket_signed_urls.sql` (مُطبَّقة حيّاً)
+
+- `update storage.buckets set public = false where id = 'course-files';`
+- فهرس بسيط `idx_files_storage_path` (بحث سريع عند مطابقة كل رابط موقَّع بصفّ `files`).
+- سياسة `course_files_read` (SELECT) أُعيدت كتابتها لتصبح **فعلية لا زخرفية**: تسمح بالقراءة فقط
+  لـadmin/instructor، **أو** إن وُجد صفّ في `files` بنفس `storage_path` وحالته `published` — تماماً
+  نفس قاعدة `content_read_published` المطبَّقة على جدول `files` نفسه، مُسقَطة الآن على `storage.objects`.
+- سياسات الكتابة (INSERT/UPDATE/DELETE) لم تتغيّر — كانت محكومة بـRLS فعلياً حتى مع bucket عام (التوثيق
+  الرسمي: "Access control is still enforced for other types of operations including uploading,
+  deleting, moving, and copying" — المشكلة كانت في القراءة فقط).
+
+### `core/api.js` — من `getPublicUrl` (متزامن) إلى `createSignedUrl` (غير متزامن)
+
+- `mapFile(c, row)` تُعيد الآن **Promise** لا كائناً مباشراً: تستدعي
+  `c.storage.from('course-files').createSignedUrl(storage_path, 3600)` (صلاحية ساعة واحدة) بدل
+  `getPublicUrl`. فشل الطلب (RLS ترفض — ملف draft مثلاً) يسقط بهدوء إلى `url: null`، بلا استثناء يكسر
+  الصفحة (نفس فلسفة "فشل هادئ" المتّبعة في كل الملف).
+  `external_url`/`public_url` (لا `storage_path`) لا يزالان يُغلَّفان في `Promise.resolve` فوراً — بلا
+  أي طلب شبكة إضافي لهما، فلا تراجع أداء لأي من الصفوف الـ45 المبذولة حالياً (كلها بلا `storage_path`
+  إطلاقاً — تأكَّد هذا حياً: `count(storage_path)=0` من أصل 45 صفاً).
+- `mapLecture`/`mapSummary`/`mapAssignment` أصبحت غير متزامنة (`Promise.all` على ملفات كل عنصر) لأن
+  `mapFile` لم تعد متزامنة.
+- `assembleSubject` أصبحت تعيد `Promise` (تنتظر `Promise.all` لثلاث مصفوفات: lectures/summaries/
+  assignments) — كل مواضع الاستدعاء الثلاثة في `fetchSubjectContentWith` تُعيد قيمتها مباشرة ضمن
+  سلسلة `.then()` فتُسطَّح تلقائياً؛ **لم تحتج لأي تعديل**.
+- `adminResolveFileUrl` (تُستخدَم في `admin/files.js` لعرض رابط "فتح") عُدِّلت لتنتظر Promise
+  `mapFile` بدل قراءة `.url` من كائن متزامن.
+- **File parity محفوظة**: `fileChip()`/`subject.js` يستهلكان الشكل النهائي `{type,label,url}` فقط،
+  بمعزل تام عن كيفية بناء `url` — لا تغيير هناك إطلاقاً. تأكَّد بتشغيل كامل حزمة الاختبارات (وحدة +
+  متصفح) بلا أي فشل.
+
+### الاختبارات
+
+- استُبدل اختبار `getPublicUrl` القديم باختبارين: (1) `createSignedUrl` يُستدعى فعلياً بنفس
+  `storage_path` ومدّة صلاحية موجبة، والرابط النهائي مبنيّ من `signedUrl` لا `publicUrl`؛ (2)
+  `createSignedUrl` مرفوض (يحاكي RLS ترفض ملف draft) يسقط بهدوء إلى `url: null` بلا استثناء.
+- **161/161** اختبار وحدة، **70/70** اختبار متصفح، `npm run validate` ناجح (بلا تغيير في الأعداد).
+
+### التحقّق الحي (SQL role-switching + وثائق Supabase الرسمية — مشروع `kotbarynxzyhxhzribpf`)
+
+- ✅ **BUCKET VISIBILITY**: `select public from storage.buckets where id='course-files'` → `false`
+  (كان `true`) — مُتحقَّق مباشرة من القاعدة الحية بعد تطبيق الهجرة.
+- ✅ **PUBLISHED FILE TEST / DRAFT FILE TEST**: زُرعت صفّان اختباريان مؤقّتان (published/draft) بنفس
+  الآلية — كائن ميتاداتا في `storage.objects` + صفّ مطابق في `files` — داخل معاملة SQL واحدة، ثم
+  `set role anon` واختُبر SELECT: **published → مرئي (1 صف)**، **draft → غير مرئي (0 صف)**. كل شيء
+  داخل معاملة واحدة تُلغى فوراً (`rollback`)، فلا أثر باقٍ على القاعدة.
+- ✅ **ANON INSERT**: مرفوض فعلياً (`42501 new row violates row-level security policy`).
+- ✅ **ANON UPDATE**: لا يرفع خطأً، لكن **لا يُغيّر أي صف فعلياً** (تأكَّد بقراءة القيمة بعد المحاولة —
+  بقيت كما كانت) — سلوك RLS الطبيعي لعبارة `UPDATE` غير المطابقة لأي صف مرئي.
+- ⚠️ **ANON DELETE / ADMIN DELETE**: **لم يتغيّر القيد المكتشف في Phase B**: محفّز `storage.
+  protect_delete()` يمنع **أي** `DELETE` مباشر عبر SQL على `storage.objects` — بصرف النظر تماماً عن
+  الدور، حتى قبل تقييم RLS. لا يمكن إثبات سياسة الحذف عبر SQL إطلاقاً (قيد منصّة، لا خلل في التنفيذ)؛
+  الثقة بها تبقى قائمة على القياس المعماري مع بقية سياسات `is_admin_or_instructor()` المُثبَتة فعلياً.
+- ⚠️ **DIRECT URL TEST**: لا يوجد وصول شبكي فعلي من بيئة هذه الجلسة إلى نطاق Supabase (سياسة الوكيل
+  الصادر ترفض الاتصال صراحةً — `connect_rejected`) — لم يكن ممكناً تنفيذ طلب HTTP حقيقي على مسار
+  `/storage/v1/object/public/...` للتأكّد المباشر من رمز الاستجابة. الاستنتاج مبنيّ بدلاً من ذلك على:
+  (أ) توثيق Supabase الرسمي الصريح بأن bucket خاص لا يخدم إطلاقاً عبر مسار `object/public/` (يتطلّب
+  توقيعاً)، و(ب) إثبات SQL أعلاه لسياسة SELECT نفسها التي تتحكّم بمن يمكنه إصدار رابط موقَّع أصلاً.
+- **ORPHAN CLEANUP**: الصفّ اليتيم المُبلَّغ عنه سابقاً (`course-files/ai-data/lectures/seed-test.pdf`)
+  **غير موجود أصلاً** — `select count(*) from storage.objects where bucket_id='course-files'` أعاد
+  **صفراً** كائنات حالياً. لم يتّضح متى/كيف زال (لم يُحذَف من هذه الجلسة) — رُصِد غيابه فعلاً، لا افتُرض.
+
+### لماذا لا يوجد كسر لأي بيانات حية
+
+كل الصفوف الـ45 الحالية في `files` بلا استثناء `status='published'` وبلا `storage_path` (تعتمد كلها
+على `public_url` الثابت القديم) — الهجرة والتغيير في `mapFile` **لا يؤثران عملياً على أي محتوى حالٍ
+على الإطلاق**؛ الأثر الحقيقي يبدأ فقط مع أول ملف يُرفَع فعلياً عبر واجهة Phase C الجديدة.

@@ -1910,7 +1910,7 @@ test('validateFileForUpload(): يرفض الملفات الأكبر من 20MB ح
   assert(tooBig !== null, 'ملف 25MB يجب أن يُرفَض (الحد 20MB)');
 });
 
-test('mapFile عبر fetchAllContent(): storage_path يُحلَّل إلى رابط عام فعلي عبر getPublicUrl', async () => {
+testAsync('mapFile عبر fetchAllContent(): storage_path يُحلَّل إلى رابط موقَّع فعلي عبر createSignedUrl (PHASE B.1: Bucket خاص)', async () => {
   const seedRows = {
     subjects: [{ id: 's1', order: 1, title: 'مادة', short_title: 'م', icon: '📘', accent: '#000', status: 'published', description: '' }],
     lectures: [{ id: 'l1', subject_id: 's1', number: 1, title: 'محاضرة', date: '', status: 'published', demo: false, description: '', objectives: [] }],
@@ -1918,17 +1918,44 @@ test('mapFile عبر fetchAllContent(): storage_path يُحلَّل إلى را�
     files: [{ id: 'f1', subject_id: 's1', lecture_id: 'l1', summary_id: null, assignment_id: null, type: 'pdf', label: 'ملف مرفوع', storage_path: 's1/lectures/123-slides.pdf', external_url: null, public_url: null, status: 'published' }]
   };
   const client = fakeColumnCheckingClient(seedRows, {});
+  let seenPath = null;
+  let seenExpiry = null;
   client.storage = {
     from(bucket) {
       equal(bucket, 'course-files', 'يجب استخدام اسم الـBucket الصحيح');
-      return { getPublicUrl: (path) => ({ data: { publicUrl: 'https://project.supabase.co/storage/v1/object/public/course-files/' + path } }) };
+      return {
+        createSignedUrl: (path, expiresIn) => {
+          seenPath = path; seenExpiry = expiresIn;
+          return Promise.resolve({ data: { signedUrl: 'https://project.supabase.co/storage/v1/object/sign/course-files/' + path + '?token=abc' }, error: null });
+        }
+      };
     }
   };
   const sbDLP = loadSupabaseLayer({ configOverride: { enabled: true }, fakeClientLib: { createClient: () => client } });
   const result = await sbDLP.api.fetchAllContent();
   const url = result.data.s1.lectures[0].files[0].url;
-  equal(url, 'https://project.supabase.co/storage/v1/object/public/course-files/s1/lectures/123-slides.pdf',
-    'رابط الملف يجب أن يُبنى فعلياً عبر storage.from(bucket).getPublicUrl(storage_path)');
+  equal(seenPath, 's1/lectures/123-slides.pdf', 'createSignedUrl يجب أن يُستدعى بنفس storage_path المخزَّن حرفياً');
+  assert(seenExpiry > 0, 'يجب تمرير مدّة صلاحية موجبة للرابط الموقَّع');
+  equal(url, 'https://project.supabase.co/storage/v1/object/sign/course-files/s1/lectures/123-slides.pdf?token=abc',
+    'رابط الملف يجب أن يُبنى فعلياً عبر storage.from(bucket).createSignedUrl(storage_path, ttl) لا getPublicUrl');
+});
+
+testAsync('mapFile(): createSignedUrl مرفوض (RLS تمنع القراءة — ملف draft مثلاً) يسقط بهدوء إلى url:null بلا استثناء', async () => {
+  const seedRows = {
+    subjects: [{ id: 's1', order: 1, title: 'مادة', short_title: 'م', icon: '📘', accent: '#000', status: 'published', description: '' }],
+    lectures: [{ id: 'l1', subject_id: 's1', number: 1, title: 'محاضرة', date: '', status: 'published', demo: false, description: '', objectives: [] }],
+    summaries: [], assignments: [], quizzes: [], references: [], resources: [], updates: [],
+    files: [{ id: 'f1', subject_id: 's1', lecture_id: 'l1', summary_id: null, assignment_id: null, type: 'pdf', label: 'ملف مرفوع', storage_path: 's1/lectures/123-slides.pdf', external_url: null, public_url: null, status: 'draft' }]
+  };
+  const client = fakeColumnCheckingClient(seedRows, {});
+  client.storage = {
+    from() {
+      return { createSignedUrl: () => Promise.resolve({ data: null, error: { message: 'Object not found', statusCode: '404' } }) };
+    }
+  };
+  const sbDLP = loadSupabaseLayer({ configOverride: { enabled: true }, fakeClientLib: { createClient: () => client } });
+  const result = await sbDLP.api.fetchAllContent();
+  equal(result.data.s1.lectures[0].files[0].url, null, 'رابط ملف مرفوض من RLS يجب أن يكون null لا رمياً لاستثناء يكسر الصفحة');
 });
 
 testAsync('adminUploadFile(): يرفض الملف محلياً بلا أي استدعاء شبكة لو فشل التحقّق (نوع/حجم)', async () => {

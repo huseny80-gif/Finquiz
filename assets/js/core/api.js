@@ -30,52 +30,75 @@
 
   var STORAGE_BUCKET = 'course-files';
 
+  // مدّة صلاحية الرابط الموقَّع (ثانية) — ساعة واحدة تكفي لعرض/تنزيل ملف أثناء
+  // جلسة تصفّح طبيعية؛ رابط منتهي الصلاحية لا يكسر أي بيانات (استعادة الصفحة
+  // تطلب رابطاً جديداً صالحاً عبر hydrate() القادمة). انظر PHASE B.1 أدناه.
+  var SIGNED_URL_TTL_SECONDS = 3600;
+
   /** يبني كائن ملف بنفس شكل {type,label,url} الذي يستهلكه fileChip() في
    * components/subject.js — مطابق تماماً لشكل data/subjects/*.js الثابت.
-   * ترتيب أولوية الرابط: storage_path (ملف مرفوع فعلياً إلى Bucket
-   * course-files — يُحلَّل إلى رابط عام عبر getPublicUrl، استدعاء متزامن بلا
-   * شبكة فعلية لأن الـBucket عام؛ انظر توثيق القرار الأمني في
-   * supabase/migrations/010_storage_bucket_and_file_columns.sql)، ثم
-   * external_url (رابط خارجي صريح: يوتيوب/درايف/أي رابط)، ثم public_url
-   * (توافق عكسي بحت مع البذرة الثابتة الحالية — 45 صفاً مبذولاً لا تحمل
-   * storage_path ولا external_url إطلاقاً، فتبقى تعمل بلا أي تغيير). */
+   *
+   * PHASE B.1 (تصحيح أمني): Bucket course-files كان public=true — وهذا يتجاوز
+   * RLS تماماً لعمليات القراءة (موثَّق رسمياً في وثائق Supabase؛ انظر
+   * supabase/migrations/011_private_bucket_signed_urls.sql للتفاصيل الكاملة)،
+   * أي أن ملف draft كان قابلاً للوصول المباشر لأي شخص يعرف/يخمّن storage_path
+   * رغم حجب صفّه في جدول files. أصبح الـBucket private، والقراءة الفعلية عبر
+   * createSignedUrl (غير متزامن، يتطلّب اجتياز سياسة RLS الجديدة على
+   * storage.objects التي تتحقّق فعلياً من status='published' في جدول files
+   * نفسه أو admin/instructor) بدل getPublicUrl (متزامن، بلا أي تحقّق فعلي).
+   * ترتيب أولوية الرابط: storage_path (رابط موقَّع، أو null لو رفضت RLS
+   * الطلب — لا يُفترض حدوث هذا لملف published فعلياً)، ثم external_url (رابط
+   * خارجي صريح: يوتيوب/درايف/أي رابط)، ثم public_url (توافق عكسي بحت مع
+   * البذرة الثابتة الحالية — صفوف مبذولة لا تحمل storage_path ولا external_url
+   * إطلاقاً، فتبقى تعمل بلا أي تغيير). */
   function mapFile(c, row) {
-    var url = null;
     if (row.storage_path) {
-      var resolved = c.storage.from(STORAGE_BUCKET).getPublicUrl(row.storage_path);
-      url = (resolved && resolved.data && resolved.data.publicUrl) || null;
-    } else if (row.external_url) {
-      url = row.external_url;
-    } else if (row.public_url) {
-      url = row.public_url;
+      return c.storage.from(STORAGE_BUCKET).createSignedUrl(row.storage_path, SIGNED_URL_TTL_SECONDS)
+        .then(function (result) {
+          var url = (result && result.data && result.data.signedUrl) || null;
+          return { type: row.type, label: row.label, url: url };
+        });
     }
-    return { type: row.type, label: row.label, url: url };
+    var url = row.external_url || row.public_url || null;
+    return Promise.resolve({ type: row.type, label: row.label, url: url });
   }
 
+  /** ترسم كل ملفات كيان واحد (محاضرة/ملخّص/واجب) إلى روابطها النهائية بالتوازي
+   * — mapFile أصبحت غير متزامنة (PHASE B.1: createSignedUrl شبكي)، فلا بدّ من
+   * Promise.all هنا قبل إرجاع الكائن النهائي. */
   function mapLecture(c, row, filesByLecture) {
-    return {
-      id: row.id, number: row.number, title: row.title, date: row.date,
-      status: row.status, demo: row.demo, description: row.description,
-      objectives: row.objectives || [],
-      files: (filesByLecture[row.id] || []).map(function (f) { return mapFile(c, f); })
-    };
+    return Promise.all((filesByLecture[row.id] || []).map(function (f) { return mapFile(c, f); }))
+      .then(function (files) {
+        return {
+          id: row.id, number: row.number, title: row.title, date: row.date,
+          status: row.status, demo: row.demo, description: row.description,
+          objectives: row.objectives || [],
+          files: files
+        };
+      });
   }
 
   function mapSummary(c, row, filesBySummary) {
-    return {
-      id: row.id, lectureId: row.lecture_id, title: row.title, date: row.date,
-      status: row.status, demo: row.demo,
-      keyPoints: row.key_points || [], concepts: row.concepts || [], terms: row.terms || [],
-      files: (filesBySummary[row.id] || []).map(function (f) { return mapFile(c, f); })
-    };
+    return Promise.all((filesBySummary[row.id] || []).map(function (f) { return mapFile(c, f); }))
+      .then(function (files) {
+        return {
+          id: row.id, lectureId: row.lecture_id, title: row.title, date: row.date,
+          status: row.status, demo: row.demo,
+          keyPoints: row.key_points || [], concepts: row.concepts || [], terms: row.terms || [],
+          files: files
+        };
+      });
   }
 
   function mapAssignment(c, row, filesByAssignment) {
-    return {
-      id: row.id, title: row.title, difficulty: row.difficulty, date: row.date,
-      due: row.due, status: row.status, demo: row.demo, description: row.description,
-      files: (filesByAssignment[row.id] || []).map(function (f) { return mapFile(c, f); })
-    };
+    return Promise.all((filesByAssignment[row.id] || []).map(function (f) { return mapFile(c, f); }))
+      .then(function (files) {
+        return {
+          id: row.id, title: row.title, difficulty: row.difficulty, date: row.date,
+          due: row.due, status: row.status, demo: row.demo, description: row.description,
+          files: files
+        };
+      });
   }
 
   /** يستخرج رقم تسلسل السؤال من نهاية معرّفه ("rm-q1-13" → 13) لترتيب الأسئلة
@@ -250,6 +273,10 @@
     });
   }
 
+  /** تعيد Promise لكائن المادة الكامل — أصبحت غير متزامنة (PHASE B.1: mapLecture/
+   * mapSummary/mapAssignment تنتظر الآن روابط Storage الموقَّعة شبكياً)؛ كل
+   * استدعاءاتها (fetchSubjectContentWith) تُعيد قيمتها مباشرة ضمن سلسلة .then()
+   * فتُسطَّح تلقائياً — لا حاجة لتعديل أي موضع استدعاء. */
   function assembleSubject(c, subjectRow, lectures, summaries, assignments, quizzes,
     questions, optionsByQuestion, itemsByQuestion, pairsByQuestion, references, resources, updates,
     filesByLecture, filesBySummary, filesByAssignment) {
@@ -258,26 +285,32 @@
     filesBySummary = filesBySummary || {};
     filesByAssignment = filesByAssignment || {};
 
-    return {
-      id: subjectRow.id, order: subjectRow.order, title: subjectRow.title,
-      shortTitle: subjectRow.short_title, icon: subjectRow.icon, accent: subjectRow.accent,
-      status: subjectRow.status, description: subjectRow.description,
-      lectures: lectures.map(function (row) { return mapLecture(c, row, filesByLecture); }),
-      summaries: summaries.map(function (row) { return mapSummary(c, row, filesBySummary); }),
-      assignments: assignments.map(function (row) { return mapAssignment(c, row, filesByAssignment); }),
-      quizzes: quizzes.map(function (quiz) {
-        return {
-          id: quiz.id, title: quiz.title, status: quiz.status, demo: quiz.demo,
-          description: quiz.description,
-          questions: (questionsByQuiz[quiz.id] || []).map(function (q) {
-            return mapQuestion(q, optionsByQuestion, itemsByQuestion, pairsByQuestion);
-          })
-        };
-      }),
-      references: references.map(mapReference),
-      resources: resources.map(mapResource),
-      updates: updates.map(mapUpdate)
-    };
+    return Promise.all([
+      Promise.all(lectures.map(function (row) { return mapLecture(c, row, filesByLecture); })),
+      Promise.all(summaries.map(function (row) { return mapSummary(c, row, filesBySummary); })),
+      Promise.all(assignments.map(function (row) { return mapAssignment(c, row, filesByAssignment); }))
+    ]).then(function (mapped) {
+      return {
+        id: subjectRow.id, order: subjectRow.order, title: subjectRow.title,
+        shortTitle: subjectRow.short_title, icon: subjectRow.icon, accent: subjectRow.accent,
+        status: subjectRow.status, description: subjectRow.description,
+        lectures: mapped[0],
+        summaries: mapped[1],
+        assignments: mapped[2],
+        quizzes: quizzes.map(function (quiz) {
+          return {
+            id: quiz.id, title: quiz.title, status: quiz.status, demo: quiz.demo,
+            description: quiz.description,
+            questions: (questionsByQuiz[quiz.id] || []).map(function (q) {
+              return mapQuestion(q, optionsByQuestion, itemsByQuestion, pairsByQuestion);
+            })
+          };
+        }),
+        references: references.map(mapReference),
+        resources: resources.map(mapResource),
+        updates: updates.map(mapUpdate)
+      };
+    });
   }
 
   /** يجلب كل المواد المنشورة، بترتيبها، بلا محتواها الداخلي (استعلام خفيف). */
@@ -599,7 +632,7 @@
    * فقط لعرض رابط "فتح" في لوحة الإدارة؛ لا صلة له بمسار القراءة العام
    * (fetchSubjectContent) الذي يبني هذا الرابط ضمن DLP.data مباشرة. */
   function adminResolveFileUrl(fileRow) {
-    return requireClient().then(function (c) { return mapFile(c, fileRow).url; });
+    return requireClient().then(function (c) { return mapFile(c, fileRow); }).then(function (mapped) { return mapped.url; });
   }
 
   DLP.api = {
