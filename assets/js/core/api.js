@@ -28,28 +28,77 @@
   /* قراءة المحتوى العام (بلا تسجيل دخول) — تعيد نفس أشكال data/subjects/*.js */
   /* -------------------------------------------------------------------- */
 
-  function mapLecture(row) {
-    return {
-      id: row.id, number: row.number, title: row.title, date: row.date,
-      status: row.status, demo: row.demo, description: row.description,
-      objectives: row.objectives || [], files: []
-    };
+  var STORAGE_BUCKET = 'course-files';
+
+  // مدّة صلاحية الرابط الموقَّع (ثانية) — ساعة واحدة تكفي لعرض/تنزيل ملف أثناء
+  // جلسة تصفّح طبيعية؛ رابط منتهي الصلاحية لا يكسر أي بيانات (استعادة الصفحة
+  // تطلب رابطاً جديداً صالحاً عبر hydrate() القادمة). انظر PHASE B.1 أدناه.
+  var SIGNED_URL_TTL_SECONDS = 3600;
+
+  /** يبني كائن ملف بنفس شكل {type,label,url} الذي يستهلكه fileChip() في
+   * components/subject.js — مطابق تماماً لشكل data/subjects/*.js الثابت.
+   *
+   * PHASE B.1 (تصحيح أمني): Bucket course-files كان public=true — وهذا يتجاوز
+   * RLS تماماً لعمليات القراءة (موثَّق رسمياً في وثائق Supabase؛ انظر
+   * supabase/migrations/011_private_bucket_signed_urls.sql للتفاصيل الكاملة)،
+   * أي أن ملف draft كان قابلاً للوصول المباشر لأي شخص يعرف/يخمّن storage_path
+   * رغم حجب صفّه في جدول files. أصبح الـBucket private، والقراءة الفعلية عبر
+   * createSignedUrl (غير متزامن، يتطلّب اجتياز سياسة RLS الجديدة على
+   * storage.objects التي تتحقّق فعلياً من status='published' في جدول files
+   * نفسه أو admin/instructor) بدل getPublicUrl (متزامن، بلا أي تحقّق فعلي).
+   * ترتيب أولوية الرابط: storage_path (رابط موقَّع، أو null لو رفضت RLS
+   * الطلب — لا يُفترض حدوث هذا لملف published فعلياً)، ثم external_url (رابط
+   * خارجي صريح: يوتيوب/درايف/أي رابط)، ثم public_url (توافق عكسي بحت مع
+   * البذرة الثابتة الحالية — صفوف مبذولة لا تحمل storage_path ولا external_url
+   * إطلاقاً، فتبقى تعمل بلا أي تغيير). */
+  function mapFile(c, row) {
+    if (row.storage_path) {
+      return c.storage.from(STORAGE_BUCKET).createSignedUrl(row.storage_path, SIGNED_URL_TTL_SECONDS)
+        .then(function (result) {
+          var url = (result && result.data && result.data.signedUrl) || null;
+          return { type: row.type, label: row.label, url: url };
+        });
+    }
+    var url = row.external_url || row.public_url || null;
+    return Promise.resolve({ type: row.type, label: row.label, url: url });
   }
 
-  function mapSummary(row) {
-    return {
-      id: row.id, lectureId: row.lecture_id, title: row.title, date: row.date,
-      status: row.status, demo: row.demo,
-      keyPoints: row.key_points || [], concepts: row.concepts || [], terms: row.terms || [],
-      files: []
-    };
+  /** ترسم كل ملفات كيان واحد (محاضرة/ملخّص/واجب) إلى روابطها النهائية بالتوازي
+   * — mapFile أصبحت غير متزامنة (PHASE B.1: createSignedUrl شبكي)، فلا بدّ من
+   * Promise.all هنا قبل إرجاع الكائن النهائي. */
+  function mapLecture(c, row, filesByLecture) {
+    return Promise.all((filesByLecture[row.id] || []).map(function (f) { return mapFile(c, f); }))
+      .then(function (files) {
+        return {
+          id: row.id, number: row.number, title: row.title, date: row.date,
+          status: row.status, demo: row.demo, description: row.description,
+          objectives: row.objectives || [],
+          files: files
+        };
+      });
   }
 
-  function mapAssignment(row) {
-    return {
-      id: row.id, title: row.title, difficulty: row.difficulty, date: row.date,
-      due: row.due, status: row.status, demo: row.demo, description: row.description, files: []
-    };
+  function mapSummary(c, row, filesBySummary) {
+    return Promise.all((filesBySummary[row.id] || []).map(function (f) { return mapFile(c, f); }))
+      .then(function (files) {
+        return {
+          id: row.id, lectureId: row.lecture_id, title: row.title, date: row.date,
+          status: row.status, demo: row.demo,
+          keyPoints: row.key_points || [], concepts: row.concepts || [], terms: row.terms || [],
+          files: files
+        };
+      });
+  }
+
+  function mapAssignment(c, row, filesByAssignment) {
+    return Promise.all((filesByAssignment[row.id] || []).map(function (f) { return mapFile(c, f); }))
+      .then(function (files) {
+        return {
+          id: row.id, title: row.title, difficulty: row.difficulty, date: row.date,
+          due: row.due, status: row.status, demo: row.demo, description: row.description,
+          files: files
+        };
+      });
   }
 
   /** يستخرج رقم تسلسل السؤال من نهاية معرّفه ("rm-q1-13" → 13) لترتيب الأسئلة
@@ -150,7 +199,11 @@
       c.from('quizzes').select('*').eq('subject_id', subjectId),
       c.from('references').select('*').eq('subject_id', subjectId),
       c.from('resources').select('*').eq('subject_id', subjectId),
-      c.from('updates').select('*').eq('subject_id', subjectId).order('date', { ascending: false })
+      c.from('updates').select('*').eq('subject_id', subjectId).order('date', { ascending: false }),
+      // جدول files عديم الشكل (لا قيود أعمدة عليه، بخلاف questions) — يُجلَب مرة واحدة
+      // لكل مادة ثم يُوزَّع محلياً على المحاضرات/الملخصات/الواجبات بمعرّفها، بدل استعلام
+      // منفصل لكل صفّ (أداء).
+      c.from('files').select('*').eq('subject_id', subjectId)
     ]).then(function (results) {
       var lectures = unwrap(results[0]) || [];
       var summaries = unwrap(results[1]) || [];
@@ -159,11 +212,16 @@
       var references = unwrap(results[4]) || [];
       var resources = unwrap(results[5]) || [];
       var updates = unwrap(results[6]) || [];
+      var files = unwrap(results[7]) || [];
+      var filesByLecture = groupBy(files, 'lecture_id');
+      var filesBySummary = groupBy(files, 'summary_id');
+      var filesByAssignment = groupBy(files, 'assignment_id');
 
       var quizIds = quizzes.map(function (q) { return q.id; });
       if (!quizIds.length) {
-        return assembleSubject(subjectRow, lectures, summaries, assignments,
-          quizzes, [], {}, {}, {}, references, resources, updates);
+        return assembleSubject(c, subjectRow, lectures, summaries, assignments,
+          quizzes, [], {}, {}, {}, references, resources, updates,
+          filesByLecture, filesBySummary, filesByAssignment);
       }
 
       // أعمدة questions محدَّدة صراحةً (لا select('*')): answer/rubric/explanation
@@ -181,8 +239,9 @@
         });
         var questionIds = questions.map(function (q) { return q.id; });
         if (!questionIds.length) {
-          return assembleSubject(subjectRow, lectures, summaries, assignments,
-            quizzes, questions, {}, {}, {}, references, resources, updates);
+          return assembleSubject(c, subjectRow, lectures, summaries, assignments,
+            quizzes, questions, {}, {}, {}, references, resources, updates,
+            filesByLecture, filesBySummary, filesByAssignment);
         }
         var matchIds = questions.filter(function (q) { return q.type === 'match'; }).map(function (q) { return q.id; });
         return Promise.all([
@@ -205,38 +264,53 @@
           var items = unwrap(subResults[1]) || [];
           var pairsByQuestion = {};
           subResults[2].forEach(function (entry) { pairsByQuestion[entry.id] = entry.pairs; });
-          return assembleSubject(subjectRow, lectures, summaries, assignments,
+          return assembleSubject(c, subjectRow, lectures, summaries, assignments,
             quizzes, questions, groupBy(options, 'question_id'), groupBy(items, 'question_id'),
-            pairsByQuestion, references, resources, updates);
+            pairsByQuestion, references, resources, updates,
+            filesByLecture, filesBySummary, filesByAssignment);
         });
       });
     });
   }
 
-  function assembleSubject(subjectRow, lectures, summaries, assignments, quizzes,
-    questions, optionsByQuestion, itemsByQuestion, pairsByQuestion, references, resources, updates) {
+  /** تعيد Promise لكائن المادة الكامل — أصبحت غير متزامنة (PHASE B.1: mapLecture/
+   * mapSummary/mapAssignment تنتظر الآن روابط Storage الموقَّعة شبكياً)؛ كل
+   * استدعاءاتها (fetchSubjectContentWith) تُعيد قيمتها مباشرة ضمن سلسلة .then()
+   * فتُسطَّح تلقائياً — لا حاجة لتعديل أي موضع استدعاء. */
+  function assembleSubject(c, subjectRow, lectures, summaries, assignments, quizzes,
+    questions, optionsByQuestion, itemsByQuestion, pairsByQuestion, references, resources, updates,
+    filesByLecture, filesBySummary, filesByAssignment) {
     var questionsByQuiz = groupBy(questions, 'quiz_id');
+    filesByLecture = filesByLecture || {};
+    filesBySummary = filesBySummary || {};
+    filesByAssignment = filesByAssignment || {};
 
-    return {
-      id: subjectRow.id, order: subjectRow.order, title: subjectRow.title,
-      shortTitle: subjectRow.short_title, icon: subjectRow.icon, accent: subjectRow.accent,
-      status: subjectRow.status, description: subjectRow.description,
-      lectures: lectures.map(mapLecture),
-      summaries: summaries.map(mapSummary),
-      assignments: assignments.map(mapAssignment),
-      quizzes: quizzes.map(function (quiz) {
-        return {
-          id: quiz.id, title: quiz.title, status: quiz.status, demo: quiz.demo,
-          description: quiz.description,
-          questions: (questionsByQuiz[quiz.id] || []).map(function (q) {
-            return mapQuestion(q, optionsByQuestion, itemsByQuestion, pairsByQuestion);
-          })
-        };
-      }),
-      references: references.map(mapReference),
-      resources: resources.map(mapResource),
-      updates: updates.map(mapUpdate)
-    };
+    return Promise.all([
+      Promise.all(lectures.map(function (row) { return mapLecture(c, row, filesByLecture); })),
+      Promise.all(summaries.map(function (row) { return mapSummary(c, row, filesBySummary); })),
+      Promise.all(assignments.map(function (row) { return mapAssignment(c, row, filesByAssignment); }))
+    ]).then(function (mapped) {
+      return {
+        id: subjectRow.id, order: subjectRow.order, title: subjectRow.title,
+        shortTitle: subjectRow.short_title, icon: subjectRow.icon, accent: subjectRow.accent,
+        status: subjectRow.status, description: subjectRow.description,
+        lectures: mapped[0],
+        summaries: mapped[1],
+        assignments: mapped[2],
+        quizzes: quizzes.map(function (quiz) {
+          return {
+            id: quiz.id, title: quiz.title, status: quiz.status, demo: quiz.demo,
+            description: quiz.description,
+            questions: (questionsByQuiz[quiz.id] || []).map(function (q) {
+              return mapQuestion(q, optionsByQuestion, itemsByQuestion, pairsByQuestion);
+            })
+          };
+        }),
+        references: references.map(mapReference),
+        resources: resources.map(mapResource),
+        updates: updates.map(mapUpdate)
+      };
+    });
   }
 
   /** يجلب كل المواد المنشورة، بترتيبها، بلا محتواها الداخلي (استعلام خفيف). */
@@ -318,9 +392,13 @@
   }
 
   /* -------------------------------------------------------------------- */
-  /* سقالة الإدارة (Stage 4) — قراءة فقط. الكتابة تبقى عبر RLS مباشرة        */
-  /* (content_write_admin/questions_write_admin/... في 002_rls.sql) في مرحلة */
-  /* لاحقة؛ لا نماذج تحرير/حذف هنا بعد.                                     */
+  /* سقالة الإدارة — قراءة + كتابة كاملة الآن (Phase D). كل دوال الكتابة       */
+  /* أدناه لا تحمل أي حماية خاصة بها — الحماية الفعلية الوحيدة هي سياسات      */
+  /* RLS *_write_admin الموجودة فعلاً (002_rls.sql): is_admin_or_instructor() */
+  /* تُقيَّم على القاعدة لكل عملية INSERT/UPDATE/DELETE بصرف النظر عمّا يرسله  */
+  /* العميل. أي مستخدم غير admin/instructor سيتلقّى 42501 من القاعدة نفسها    */
+  /* لو حاول استدعاء أياً من هذه الدوال مباشرة (مثلاً من console المتصفح) —   */
+  /* isAdminOrInstructor() في الواجهة تحسين تجربة استخدام فقط، لا حدّ أمان.   */
   /* -------------------------------------------------------------------- */
 
   /** فحص دور واجهي بحت (تحسين تجربة استخدام) — الحماية الفعلية دائماً في RLS
@@ -341,6 +419,222 @@
     });
   }
 
+  /** الجداول التي تحمل سياسة *_write_admin فعلاً (002_rls.sql) — أي طلب كتابة
+   * لجدول خارج هذه القائمة يُرفَض هنا فوراً بلا استدعاء شبكة، بدل الاعتماد على
+   * رفض القاعدة وحده (خطأ برمجي محلي أوضح من 42501 بعيد). */
+  var ADMIN_WRITABLE_TABLES = ['subjects', 'lectures', 'summaries', 'assignments', 'quizzes',
+    'references', 'resources', 'updates', 'files', 'questions',
+    'question_options', 'question_items', 'question_pairs'];
+
+  function assertWritable(table) {
+    if (ADMIN_WRITABLE_TABLES.indexOf(table) === -1) {
+      throw new Error('جدول غير مسموح بالكتابة عبر طبقة الإدارة: ' + table);
+    }
+  }
+
+  /** يجلب صفوف جدول إداري مباشرةً (بمعزل عن DLP.data/hydrate) — تُستخدَم من
+   * صفحات لوحة الإدارة لعرض أحدث نسخة من القاعدة فور كل عملية كتابة، بدل
+   * الاعتماد على hydrate() (تُنعِش كل المنصة مرة واحدة عند التحميل فقط، لا
+   * تصلح كآلية تحديث فوري بعد كل تعديل إداري صغير). filters كائن {عمود: قيمة}. */
+  function adminList(table, filters, orderColumn) {
+    return requireClient().then(function (c) {
+      var query = c.from(table).select('*');
+      Object.keys(filters || {}).forEach(function (key) { query = query.eq(key, filters[key]); });
+      if (orderColumn) { query = query.order(orderColumn); }
+      return query.then(unwrap);
+    });
+  }
+
+  /** إدراج صفّ جديد، يعيد الصفّ كما خُزِّن فعلياً (بما فيه القيم الافتراضية
+   * مثل id/created_at التي تولّدها القاعدة). */
+  function adminInsert(table, data) {
+    assertWritable(table);
+    return requireClient().then(function (c) {
+      return c.from(table).insert(data).select().then(unwrap).then(function (rows) {
+        return (rows && rows[0]) || null;
+      });
+    });
+  }
+
+  /** تحديث جزئي لصفّ موجود بمعرّفه، يعيد الصفّ بعد التحديث. */
+  function adminUpdate(table, id, patch) {
+    assertWritable(table);
+    return requireClient().then(function (c) {
+      return c.from(table).update(patch).eq('id', id).select().then(unwrap).then(function (rows) {
+        return (rows && rows[0]) || null;
+      });
+    });
+  }
+
+  function adminDelete(table, id) {
+    assertWritable(table);
+    return requireClient().then(function (c) {
+      return c.from(table).delete().eq('id', id).then(unwrap);
+    });
+  }
+
+  /** تغيير الحالة فقط (draft|published|archived) — غلاف رقيق فوق adminUpdate
+   * لتوضيح القصد في نداءات الواجهة. */
+  function adminSetStatus(table, id, status) {
+    return adminUpdate(table, id, { status: status });
+  }
+
+  /** يتحقق هل توجد صفوف في childTable تشير إلى id عبر fkColumn — يُستخدم قبل
+   * حذف مادة/محاضرة/اختبار لعرض تحذير واضح بدل حذف صامت يكسر علاقات (قاعدة
+   * الحذف: "لا تسمح بحذف مادة مرتبطة بمحتوى دون تحذير واضح"). لا يمنع الحذف
+   * بنفسه — يعيد فقط العدد ليقرّر المستدعي (الواجهة) كيف يُحذِّر المستخدم. */
+  function adminCountReferences(childTable, fkColumn, id) {
+    return requireClient().then(function (c) {
+      return c.from(childTable).select('id', { count: 'exact', head: true }).eq(fkColumn, id)
+        .then(function (result) {
+          if (result.error) { throw result.error; }
+          return result.count || 0;
+        });
+    });
+  }
+
+  /** يكتب حقل order لكل معرّف بترتيب المصفوفة (1-based) — لإعادة ترتيب
+   * المواد/الأسئلة عبر أزرار "تحريك للأعلى/الأسفل" في لوحة الإدارة. */
+  function adminReorder(table, orderColumn, orderedIds) {
+    assertWritable(table);
+    return requireClient().then(function (c) {
+      return Promise.all(orderedIds.map(function (id, index) {
+        var patch = {};
+        patch[orderColumn] = index + 1;
+        return c.from(table).update(patch).eq('id', id).then(unwrap);
+      }));
+    });
+  }
+
+  /** استبدال كامل لصفوف فرعية لسؤال واحد (question_options/items/pairs):
+   * حذف كل الصفوف الحالية لهذا السؤال ثم إدراج القائمة الجديدة بأكملها.
+   * ملاحظة صريحة: هذا حذف+إدراج منفصلان لا معاملة SQL واحدة (طبقة REST من
+   * العميل لا تدعم معاملات متعددة الاستعلامات) — مقبول لاستخدام إداري
+   * تسلسلي (مشرف واحد يحرر سؤالاً واحداً في كل مرة)، وغير آمن ضد تعديلين
+   * متزامنين لنفس السؤال بالضبط؛ هذا خطر مقبول لنطاق الاستخدام الحالي (لوحة
+   * إدارة داخلية بعدد مشرفين محدود)، لا افتراضاً يُخفى. */
+  function adminReplaceQuestionChildren(childTable, questionId, rows) {
+    assertWritable(childTable);
+    return requireClient().then(function (c) {
+      return c.from(childTable).delete().eq('question_id', questionId).then(unwrap).then(function () {
+        if (!rows || !rows.length) { return []; }
+        var withQid = rows.map(function (row) {
+          var copy = {};
+          for (var key in row) { if (row.hasOwnProperty(key)) { copy[key] = row[key]; } }
+          copy.question_id = questionId;
+          return copy;
+        });
+        return c.from(childTable).insert(withQid).select().then(unwrap);
+      });
+    });
+  }
+
+  /* ---------------------------------------------------------------------- */
+  /* Storage (Phase B) — رفع/حذف ملفات فعلية إلى Bucket course-files.         */
+  /* الحماية الفعلية في سياسات storage.objects (supabase/migrations/          */
+  /* 010_storage_bucket_and_file_columns.sql): الكتابة (رفع/تعديل/حذف)        */
+  /* مقصورة على admin/instructor عبر is_admin_or_instructor() على مستوى        */
+  /* القاعدة؛ التحقّقات هنا (نوع/حجم/اسم) طبقة دفاع إضافية في العميل، لا بديلاً */
+  /* عنها — الـBucket نفسه يحمل allowed_mime_types/file_size_limit مطابقين،    */
+  /* فأي محاولة تتجاوز هذا التحقّق العميل ستُرفَض من الخادم أيضاً.              */
+  /* ---------------------------------------------------------------------- */
+
+  var ALLOWED_FILE_MIME_TYPES = [
+    'application/pdf',
+    'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+    'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+    'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    'image/png', 'image/jpeg', 'image/webp', 'image/gif'
+  ];
+  var MAX_FILE_SIZE_BYTES = 20 * 1024 * 1024; // 20MB — يطابق file_size_limit على الـBucket
+  var STORAGE_CATEGORIES = ['lectures', 'summaries', 'assignments', 'resources'];
+
+  /** ينظّف اسم ملف قبل استخدامه في مسار Storage: يمنع path traversal (../،
+   * مسارات مطلقة)، محارف تحكّم، ومحارف خطرة على أنظمة ملفات/روابط. لا يُعتمَد
+   * عليه كحماية وحيدة — سياسات storage.objects وقيود الـBucket هي الحماية
+   * الفعلية — لكنه يمنع أسماء ملفات مضلِّلة أو مكسورة من الوصول لاستدعاء
+   * الرفع أصلاً بدل الاعتماد فقط على رفض الخادم البعيد. */
+  function sanitizeFileName(name) {
+    var base = String(name || '').split(/[\\/]/).pop(); // يزيل أي مسار قبل الاسم (يمنع ../)
+    var cleaned = '';
+    for (var i = 0; i < base.length; i++) {
+      var code = base.charCodeAt(i);
+      if (code >= 32 && code !== 127) { cleaned += base.charAt(i); } // يسقط محارف التحكم
+    }
+    cleaned = cleaned.replace(/[^A-Za-z0-9._-]+/g, '-'); // أي محرف آخر (بما فيه مسافات) → شرطة
+    cleaned = cleaned.replace(/^\.+/, '').replace(/-{2,}/g, '-'); // يمنع اسماً كله "." ويقلّص الشرطات المتكرّرة
+    cleaned = cleaned.slice(0, 150);
+    return cleaned || 'file';
+  }
+
+  /** يبني مسار Storage آمناً: <subject>/<category>/<طابع زمني>-<اسم منظَّف> —
+   * الطابع الزمني يمنع تعارض الأسماء (رفع ملفين بنفس الاسم لا يستبدل أحدهما
+   * الآخر صامتاً). category غير المعروفة تُعامَل كـ"resources" افتراضياً. */
+  function buildStoragePath(subjectId, category, fileName) {
+    var safeSubject = String(subjectId || '').replace(/[^a-z0-9-]/gi, '');
+    var safeCategory = STORAGE_CATEGORIES.indexOf(category) !== -1 ? category : 'resources';
+    return safeSubject + '/' + safeCategory + '/' + Date.now() + '-' + sanitizeFileName(fileName);
+  }
+
+  /** يتحقّق من نوع/حجم ملف قبل أي محاولة رفع فعلية — نفس القيود المضبوطة على
+   * الـBucket نفسه، مكرَّرة هنا لإعطاء رسالة خطأ فورية بدل انتظار رفض الخادم
+   * البعيد (تجربة استخدام أفضل، لا حماية إضافية فعلية). */
+  function validateFileForUpload(file) {
+    if (!file) { return 'لا يوجد ملف'; }
+    if (ALLOWED_FILE_MIME_TYPES.indexOf(file.type) === -1) { return 'نوع الملف غير مسموح: ' + file.type; }
+    if (file.size > MAX_FILE_SIZE_BYTES) { return 'حجم الملف يتجاوز الحد المسموح (20MB)'; }
+    return null;
+  }
+
+  /** يرفع ملفاً فعلياً إلى Storage وينشئ صفّ files مرتبطاً به. admin/instructor
+   * فقط فعلياً (RLS على storage.objects وfiles كلاهما يرفضان غير ذلك من
+   * القاعدة نفسها بصرف النظر عمّا يستدعيه العميل).
+   * options: {subjectId, lectureId, summaryId, assignmentId, category, label, type, status}. */
+  function adminUploadFile(file, options) {
+    options = options || {};
+    var validationError = validateFileForUpload(file);
+    if (validationError) { return Promise.reject(new Error(validationError)); }
+    var storagePath = buildStoragePath(options.subjectId, options.category, file.name);
+    return requireClient().then(function (c) {
+      return c.storage.from(STORAGE_BUCKET).upload(storagePath, file, { contentType: file.type, upsert: false })
+        .then(function (result) {
+          if (result.error) { throw result.error; }
+          return adminInsert('files', {
+            subject_id: options.subjectId || null, lecture_id: options.lectureId || null,
+            summary_id: options.summaryId || null, assignment_id: options.assignmentId || null,
+            name: options.label || file.name, file_name: file.name, type: options.type || file.type,
+            label: options.label || file.name, storage_path: storagePath, mime_type: file.type,
+            size: file.size, status: options.status || 'draft'
+          });
+        });
+    });
+  }
+
+  /** يحذف ملفاً: كائن Storage أولاً ثم صفّ files (بهذا الترتيب تحديداً — لو
+   * فشل حذف صفّ files بعد نجاح حذف الكائن، يبقى الصفّ يشير لملف محذوف فيظهر
+   * "قادم قريباً" بدل رابط معطَّل صامت؛ العكس قد يترك كائناً يتيماً في Storage
+   * بلا أي صفّ يشير إليه. كلا الفشلين الجزئيين ممكن نظرياً بلا معاملة واحدة
+   * تغطّي Storage وPostgres معاً — هذا الترتيب أكثر أماناً للمستخدم النهائي،
+   * لا ضماناً مطلقاً). ملفات public_url/external_url القديمة (بلا storage_path)
+   * تُحذَف من الجدول فقط، بلا أي استدعاء Storage. */
+  function adminDeleteFile(fileRow) {
+    return requireClient().then(function (c) {
+      var removeStorage = fileRow.storage_path
+        ? c.storage.from(STORAGE_BUCKET).remove([fileRow.storage_path]).then(function (result) {
+            if (result.error) { throw result.error; }
+          })
+        : Promise.resolve();
+      return removeStorage.then(function () { return adminDelete('files', fileRow.id); });
+    });
+  }
+
+  /** يحلّ رابط عرض صفّ files لواجهة الإدارة (نفس منطق mapFile بالضبط) — يُستخدَم
+   * فقط لعرض رابط "فتح" في لوحة الإدارة؛ لا صلة له بمسار القراءة العام
+   * (fetchSubjectContent) الذي يبني هذا الرابط ضمن DLP.data مباشرة. */
+  function adminResolveFileUrl(fileRow) {
+    return requireClient().then(function (c) { return mapFile(c, fileRow); }).then(function (mapped) { return mapped.url; });
+  }
+
   DLP.api = {
     isReady: isReady,
     fetchAllContent: fetchAllContent,
@@ -354,7 +648,21 @@
     fetchStudentProgress: fetchStudentProgress,
     fetchMyAttempts: fetchMyAttempts,
     isAdminOrInstructor: isAdminOrInstructor,
-    fetchQuizQuestionsAdmin: fetchQuizQuestionsAdmin
+    fetchQuizQuestionsAdmin: fetchQuizQuestionsAdmin,
+    adminList: adminList,
+    adminInsert: adminInsert,
+    adminUpdate: adminUpdate,
+    adminDelete: adminDelete,
+    adminSetStatus: adminSetStatus,
+    adminCountReferences: adminCountReferences,
+    adminReorder: adminReorder,
+    adminReplaceQuestionChildren: adminReplaceQuestionChildren,
+    sanitizeFileName: sanitizeFileName,
+    buildStoragePath: buildStoragePath,
+    validateFileForUpload: validateFileForUpload,
+    adminUploadFile: adminUploadFile,
+    adminDeleteFile: adminDeleteFile,
+    adminResolveFileUrl: adminResolveFileUrl
   };
 
   if (typeof module !== 'undefined' && module.exports) { module.exports = DLP.api; }

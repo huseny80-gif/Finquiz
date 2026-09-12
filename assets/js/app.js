@@ -119,6 +119,28 @@
     DLP.adminQuestionsView.bind(params.quizId);
   }
 
+  function renderAdminSubjectHub(params) {
+    setTitle([t('admin.title')], t('admin.intro'));
+    paint(DLP.adminSubjectHubView.render());
+    DLP.adminSubjectHubView.bind(params.id);
+  }
+
+  /** يربط مسار #/admin/subject/:id/:section بملف الإدارة الصحيح — نفس فكرة
+   * ADMIN_SECTION_VIEWS بدل if/else متكرّر لكل قسم. */
+  var ADMIN_SECTION_VIEWS = {
+    lectures: 'adminLecturesView', summaries: 'adminSummariesView', assignments: 'adminAssignmentsView',
+    quizzes: 'adminQuizzesView', references: 'adminReferencesView', resources: 'adminResourcesView',
+    updates: 'adminUpdatesView', files: 'adminFilesView'
+  };
+
+  function renderAdminSection(params) {
+    var viewName = ADMIN_SECTION_VIEWS[params.section];
+    if (!viewName || !DLP[viewName]) { return renderNotFound(); }
+    setTitle([t('admin.hub.' + params.section), t('admin.title')], t('admin.intro'));
+    paint(DLP[viewName].render());
+    DLP[viewName].bind(params.id);
+  }
+
   /** تمرير التركيز إلى عنصر محدّد عبر ?focus= */
   function focusTarget(query) {
     if (!query || !query.focus) { return; }
@@ -166,6 +188,8 @@
     DLP.router.add('/dashboard', renderDashboard);
     DLP.router.add('/admin', renderAdmin);
     DLP.router.add('/admin/quiz/:quizId', renderAdminQuiz);
+    DLP.router.add('/admin/subject/:id', renderAdminSubjectHub);
+    DLP.router.add('/admin/subject/:id/:section', renderAdminSection);
     DLP.router.add('/subject/:id', renderSubject);
     DLP.router.add('/subject/:id/:section', renderSubject);
     DLP.router.setNotFound(renderNotFound);

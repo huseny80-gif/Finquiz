@@ -445,6 +445,22 @@ function group(name) { console.log('\n▶ ' + name); }
     assert(await page.$('[data-admin-action="sign-in"]'), 'يجب أن يظهر زر تسجيل الدخول لا كشف أسئلة الاختبار مباشرة');
   });
 
+  await test('مركز إدارة مادة واحدة (Phase D) يدعو لتسجيل الدخول بلا كشف أي رابط إدارة', async () => {
+    await page.goto(base + '#/admin/subject/ai-data', { waitUntil: 'domcontentloaded' });
+    assert(await page.$('[data-admin-action="sign-in"]'), 'يجب أن يظهر زر تسجيل الدخول قبل عرض مركز إدارة المادة');
+    assert(!(await page.$('.admin-hub-card')), 'لا يجوز ظهور أي رابط إدارة فرعي قبل تسجيل الدخول');
+  });
+
+  for (const section of ['lectures', 'summaries', 'assignments', 'quizzes', 'references', 'resources', 'updates', 'files']) {
+    await test('مدير ' + section + ' الإداري (Phase D) يدعو لتسجيل الدخول بلا كشف أي بيانات ولا أخطاء Console', async () => {
+      const errBefore = consoleErrors.length;
+      await page.goto(base + '#/admin/subject/ai-data/' + section, { waitUntil: 'domcontentloaded' });
+      assert(await page.$('[data-admin-action="sign-in"]'), 'يجب أن يظهر زر تسجيل الدخول لمسار ' + section);
+      assert(!(await page.$('.data-table')), 'لا يجوز ظهور أي جدول بيانات قبل تسجيل الدخول لمسار ' + section);
+      assert(consoleErrors.length === errBefore, 'لا يجوز ظهور أي خطأ Console عند فتح مسار ' + section + ' بلا جلسة');
+    });
+  }
+
   group('التذييل والروابط');
 
   await test('التذييل يحتوي روابط المواد ومن نحن وحقوق النشر', async () => {
